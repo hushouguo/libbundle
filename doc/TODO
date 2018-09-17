@@ -1,0 +1,12 @@
+git config --global user.email "xxx@xxmail.com"
+git config --global user.name "xxx"
+git config --global credential.helper store   # when git push, store username and password
+git config --global push.default simple       # since Git 2.0, push.default is 'simple'
+$ cat ~/.gitconfig 
+[user]
+    email = xxx@xxmail.com
+    name = xxx
+[credential]
+    helper = store
+[push]
+    default = simple
