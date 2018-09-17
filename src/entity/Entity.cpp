@@ -205,15 +205,15 @@ BEGIN_NAMESPACE_BUNDLE {
 		GET_VALUE(name, string);
 	}
 
-	Value& Entity::GetValue(char* name) {
+	Entity::Value& Entity::GetValue(char* name) {
 		return this->_values[name];
 	}
 	
-	Value& Entity::GetValue(const char* name) {
+	Entity::Value& Entity::GetValue(const char* name) {
 		return this->_values[name];
 	}
 	
-	Value& Entity::GetValue(const std::string& name) {
+	Entity::Value& Entity::GetValue(const std::string& name) {
 		return this->_values[name];
 	}
 }
