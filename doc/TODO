@@ -10,3 +10,22 @@ $ cat ~/.gitconfig
     helper = store
 [push]
     default = simple
+    
+1. 实现recordserver和recordclient
+2. 编写测试用例及性能比较，localtime vs gettimeofday, json vs protobuf, ostringstream vs std::string 1 million
+3. 编写gatewayserver, centralserver, sceneserver
+4. 实现腾讯的贪吃蛇服务器研究
+5. 编写性能测试用例， tps
+6. orderver, orderclient
+7. statics server
+8. 遗留部分log to network, websocketserver heartbeat
+9. 添加libprotobuf for lua, libnet for lua, json for lua, easylog for lua等lua 接口
+10.添加杂项，获取微信token等，从以往项目中抽取, 
+11.动态修改配置并重新加载配置，热更新
+12.libevent, libcurl等常用库操作添加进去
+13.库内部预留通信指令 *
+14.protobuf 3.3 , 客户端协议打包工具，协议生成工具都需要更新
+15.考虑build release bundle library and build static executable
+16.程序启动时记录编译时间，用户等信息
+17.研究棋牌, openai
+18. recordserver要支持设置key
