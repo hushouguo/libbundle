@@ -11,7 +11,8 @@ void test_recordclient(const char* address, int port) {
 	RecordClient recordClient;
 	bool rc = recordClient.connect(address, port);
 	CHECK_RETURN(rc, void(0), "unreachable recordserver: %s,%d", address, port);
-	recordClient.serialize(10, "player", 1000, "{\"id\":1000,\"name\":\"hushouguo\",\"level\":\"138\",\"vip\":true}", 
+	recordClient.serialize(10, 
+			"player", 1000, "{\"id\":1000,\"name\":\"hushouguo\",\"level\":\"138\",\"vip\":true,\"gold\":2147483648}", 
 			[&recordClient](u32 shard, std::string table, u64 objectid, u32 retval){
 				Trace.cout("receive response:%d,%s,%ld, %d", shard, table.c_str(), objectid, retval);
 				recordClient.stop();
