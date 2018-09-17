@@ -378,7 +378,7 @@ bool RecordProcess::SlotDatabase::serialize(const char* table, const Entity* ent
 			Trace << "table: " << table << ", add new field: " << iterator.first << ", type: " << Entity::ValueTypeName(iterator.second.type);
 		}
 		
-		if (iterator.second.type != desc_fields[iterator.first].type) {
+		if (iterator.second.type != desc_fields[iterator.first]) {
 			bool rc = this->alterField(table, iterator.first, iterator.second.type);
 			CHECK_RETURN(rc, false, "modify field: %s to new type: %d error", iterator.first.c_str(), iterator.second.type);
 			Trace << "table: " << table << ", modify field: " << iterator.first << ", from type: " << Entity::ValueTypeName(desc_fields[iterator.first]) << " to new type: " << Entity::ValueTypeName(iterator.second.type);
