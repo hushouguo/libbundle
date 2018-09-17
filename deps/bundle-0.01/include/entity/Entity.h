@@ -90,7 +90,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			Value& GetValue(const char* name);
 			Value& GetValue(const std::string& name);
 
-			inline const std::unordered_map<std::string, Value>& values() { return this->_values; }
+			inline const std::unordered_map<std::string, Entity::Value>& values() const { return this->_values; }
 			
 		public:
 			void dump();

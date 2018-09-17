@@ -48,7 +48,7 @@ static std::map<Entity::value_type, std::string> v2m = {
 	{ Entity::type_integer, "BIGINT SIGNED" },
 	{ Entity::type_bool, "TINYINT UNSIGNED" },
 	{ Entity::type_float, "FLOAT" },
-	{ Entity::type_string, "VARCHAR" }	// max: 21845 utf-8, auto-expand
+	{ Entity::type_string, "TEXT" }	// VARCHAR: max: 21845 utf-8, auto-expand
 };
 
 static std::map<enum_field_types, std::function<void(Entity::Value&, std::string, bool)>> m2v = {
@@ -365,33 +365,51 @@ bool RecordProcess::SlotDatabase::serialize(const char* table, const Entity* ent
 		CHECK_RETURN(rc, false, "load field from table: %s error", table);
 	}
 
-	const std::unordered_map<std::string, Value>& values = entity->values();
-	
-	std::string sql_values, sql_updates;
-	auto pasteValues = [&sql_values]() {
-	};
+	const std::unordered_map<std::string, Entity::Value>& values = entity->values();
+
+	std::ostringstream sql_fields, sql_insert, sql_update;
+	for (auto& iterator : values) {
+		if (sql_fields.tellp() > 0) { sql_fields << ","; }
+		if (sql_insert.tellp() > 0) { sql_insert << ","; }
+		if (sql_update.tellp() > 0) { sql_update << ","; }
+
+		sql_fields << "`" << iterator.first << "`";
+
+		switch (iterator.second.type) {
+			case Entity::type_integer: 
+				sql_insert << iterator.second.value_integer;
+				sql_update << "`" << iterator.first << "`=" << iterator.second.value_integer;
+				break;
+
+			case Entity::type_float:
+				sql_insert << iterator.second.value_float;
+				sql_update << "`" << iterator.first << "`=" << iterator.second.value_float;
+				break;
+
+			case Entity::type_bool:
+				sql_insert << iterator.second.value_bool;
+				sql_update << "`" << iterator.first << "`=" << iterator.second.value_bool;
+				break;
+
+			case Entity::type_string:
+				sql_insert << "'" << iterator.second.value_string << "'";
+				sql_update << "`" << iterator.first << "`=" << "'" << iterator.second.value_string << "'";
+				break;
+
+			default: CHECK_RETURN(false, false, "illegal value type: %d", iterator.second.type); break;
+		}
+	}
 	
 	std::string sql = "INSERT INTO `";
 	sql += table;
 	sql += "` (";
-	for (auto& iterator : values) {
-		sql += "`";
-		sql += iterator.first + "`";
+	sql += sql_fields.str() + ") VALUES (";
+	sql += sql_insert.str() + ") ON DUPLICATE KEY UPDATE ";
+	sql += sql_update.str();
 
-		switch (
-		sql_values += ",";
-		if (iterator.second == Entity::type_string) {
-			sql_values += ", '";
-			sql_values += iterator.value_string;
-			sql_values += "'";
-		}
-		else {
-			sql_values += ",";
-			sql_values += 
-		}
-	}
-	
-	return false;
+	Trace << "serialize sql: " << sql;
+
+	return this->dbhandler->runCommand(sql);
 }
 
 Entity* RecordProcess::SlotDatabase::unserialize(const char* table, u64 objectid) {
@@ -438,15 +456,16 @@ Entity* RecordProcess::SlotDatabase::unserialize(const char* table, u64 objectid
 }
 
 bool RecordProcess::SlotDatabase::createTable(const char* table, const Entity* entity) {
-	const std::unordered_map<std::string, Value>& values = entity->values();
+	const std::unordered_map<std::string, Entity::Value>& values = entity->values();
 	std::string sql = "CREATE TABLE `"; // IF NOT EXISTS
 	sql += table;
-	sql += "` (`id` BIGINT UNSIGNED NOT NULL PRIMARY KEY ";
+	sql += "` (`id` BIGINT UNSIGNED NOT NULL PRIMARY KEY ";	// entity->id
 	for (auto& iterator : values) {
-		CHECK_CONTINUE(v2m.find(iterator.second) != v2m.end(), "illegal ValueType: %d", iterator.second);
+		if (iterator.first == "id") { continue; }
+		CHECK_CONTINUE(v2m.find(iterator.second.type) != v2m.end(), "illegal ValueType: %d", iterator.second.type);
 		sql += ", `";
 		sql += iterator.first + "` ";
-		sql += v2m[iterator.second] + " NOT NULL ";	//TODO: KEY setting		
+		sql += v2m[iterator.second.type] + " NOT NULL ";	//TODO: KEY setting		
 	}
 	sql += ") ENGINE=InnoDB DEFAULT CHARSET=utf8 ";
 

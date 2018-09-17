@@ -11,14 +11,4 @@
 		<mysql conf="127.0.0.1:3306:root::"/>
 		<mysql conf="127.0.0.1:3306:root::"/>
 	</shard>
-	<shard id="11" name="idc11">
-		<mysql conf="127.0.0.1:3306:root::"/>
-		<mysql conf="127.0.0.1:3306:root::"/>
-		<mysql conf="127.0.0.1:3306:root::"/>
-		<mysql conf="127.0.0.1:3306:root::"/>
-		<mysql conf="127.0.0.1:3306:root::"/>
-		<mysql conf="127.0.0.1:3306:root::"/>
-		<mysql conf="127.0.0.1:3306:root::"/>
-		<mysql conf="127.0.0.1:3306:root::"/>
-	</shard>
 </root>
