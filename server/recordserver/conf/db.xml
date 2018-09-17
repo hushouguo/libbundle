@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+	<!-- fixed 8 mysql connection for per shard -->
+	<shard id="10" name="idc10">
+		<mysql conf="127.0.0.1:3306:root::"/>
+		<mysql conf="127.0.0.1:3306:root::"/>
+		<mysql conf="127.0.0.1:3306:root::"/>
+		<mysql conf="127.0.0.1:3306:root::"/>
+		<mysql conf="127.0.0.1:3306:root::"/>
+		<mysql conf="127.0.0.1:3306:root::"/>
+		<mysql conf="127.0.0.1:3306:root::"/>
+		<mysql conf="127.0.0.1:3306:root::"/>
+	</shard>
+	<shard id="11" name="idc11">
+		<mysql conf="127.0.0.1:3306:root::"/>
+		<mysql conf="127.0.0.1:3306:root::"/>
+		<mysql conf="127.0.0.1:3306:root::"/>
+		<mysql conf="127.0.0.1:3306:root::"/>
+		<mysql conf="127.0.0.1:3306:root::"/>
+		<mysql conf="127.0.0.1:3306:root::"/>
+		<mysql conf="127.0.0.1:3306:root::"/>
+		<mysql conf="127.0.0.1:3306:root::"/>
+	</shard>
+</root>

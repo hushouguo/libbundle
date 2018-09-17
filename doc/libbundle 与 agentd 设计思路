@@ -1,0 +1,31 @@
+libbundle 提供一个库， 涵盖了 log, network, thread, xml, json, csv, timer 等常用编程组件;
+
+设计原则:
+1. 松散的，低耦合度
+	libbundle 只提供一堆零件，用户需要使用这些零件来构建自己的服务, 零件之间只有非常低的耦合度
+2. 简单分层
+	libbundle 最底层是一些基础定义，比如类型，通用枚举，常用数据结构等
+3. 聚焦具体应用，不企图大而全
+	libbundle 专注于快速实现网络服务器, 且方便的实现业务逻辑
+
+主要组件:
+1. ylog (easylog)
+ylog 实现了一个日志库
+appender: 支持 console, file, network
+layout: 
+分级:
+c++ 流方式
+过滤器: filter
+
+2. network (tcp)
+网络组件只实现了 tcp 方式
+
+3. thread 
+提供了一个线程池
+
+
+agentd 是一个基于libbundle库构建的前端代理服务器, agentd 类似于之前的gateway, 但agentd 不处理具体业务， 只聚合链接， 转发消息.
+后端可以关联不同的服务，基于 fast-cgi 协议可以处理 php; lua service, c++ service 等.
+利用 agentd 可以搭建独立的 recordserver 和 orderserver, 还有 loginserver
+
+

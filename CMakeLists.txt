@@ -1,0 +1,15 @@
+cmake_minimum_required (VERSION 2.8)
+
+set(ROOT_DIR ${PROJECT_SOURCE_DIR})
+set(DEPS_DIR ${PROJECT_SOURCE_DIR}/deps)
+set(BUNDLE_DIR ${DEPS_DIR}/bundle)
+set(PROTOBUF_DIR ${DEPS_DIR}/protobuf)
+set(TCMALLOC_DIR ${DEPS_DIR}/gperftools-2.6.1)
+set(RAPIDXML_DIR ${DEPS_DIR}/rapidxml-1.13)
+set(RAPIDJSON_DIR ${DEPS_DIR}/rapidjson-1.1.0)
+set(MYSQL_DIR ${DEPS_DIR}/mysql-5.6.37)
+
+ADD_SUBDIRECTORY(src)
+ADD_SUBDIRECTORY(server/gatewayserver)
+ADD_SUBDIRECTORY(server/recordserver)
+ADD_SUBDIRECTORY(tests)

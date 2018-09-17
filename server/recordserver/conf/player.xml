@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<root>
+  <!-- type: s32, u32, s64, u64, float, bool, string -->
+  <attribute name="s32" type="s32" />
+  <attribute name="u32" type="u32" />
+  <attribute name="s64" type="s64" />
+  <attribute name="u64" type="u64" />
+  <attribute name="float" type="float" />
+  <attribute name="bool" type="bool" />
+  <attribute name="string" type="string" />
+</root>
+

@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package record;
+
+import "common/entity.proto";
+
+//CRUD
+
+// Create
+
+message EntityCreateRequest {
+	uint32 shard						=	1;
+	string table						=	2;
+	bundle.Entity entity				=	3;
+};
+message EntityCreateResponse {
+	uint32 shard						=	1;
+	string table						=	2;
+	uint64 entityid						=	3;	// 0: failure, !0: success
+};
+
+// Retrieve
+
+message EntityRetrieveRequest {
+	uint32 shard						=	1;
+	string table						=	2;
+	uint64 entityid						=	3;
+};
+message EntityRetrieveResponse {
+	uint32 shard						=	1;
+	string table						=	2;
+	bundle.Entity entity				=	3;	// entity.id == 0: failure, !0: success
+};
+
+// Update
+
+message EntityUpdateRequest {
+	uint32 shard						=	1;
+	string table						=	2;
+	bundle.Entity entity				=	3;	// replace value, alter field type, add new field
+};
+message EntityUpdateResponse {
+	uint32 shard						=	1;
+	string table						=	2;
+	bool result							=	3;
+};
+
+// Delete
+
+message EntityDeleteRequest {
+	uint32 shard						=	1;
+	string table						=	2;
+	uint64 entityid						=	3;
+};
+message EntityDeleteResponse {
+	uint32 shard						=	1;
+	string table						=	2;
+	bool result							=	3;
+};
+
+// Select
+
+message EntitySelectRequest {
+	uint32 shard						=	1;
+	string table						=	2;
+	string where						=	3;
+};
+message EntitySelectResponse {
+	uint32 shard						=	1;
+	string table						=	2;
+	bundle.Entity entities				=	3;	// entity.id == 0: failure, !0: success
+};
+
+

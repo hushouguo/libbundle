@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package bundle;
+
+message Value {
+	enum ValueType {
+		type_s8				=	0;	// 1 byte signed
+		type_u8				=	1;	// 1 byte unsigned
+		type_s32			=	2;	// 4 bytes signed integer
+		type_u32			=	3;	// 4 bytes unsigned integer
+		type_s64			=	4;	// 8 bytes signed integer
+		type_u64			=	5;	// 8 bytes unsigned integer
+		type_bool			=	6;	// 1 byte boolean
+		type_float			=	7;	// 4 bytes float
+		type_double			=	8;	// 8 bytes double
+		type_string			=	9;	// TEXT
+		type_bytes			=	10;	// LONGBLOB
+		type_datetime		=	11;	// DATETIME
+	}
+	ValueType type						=	1;
+	sint32 value_s8						=	2;
+	uint32 value_u8						=	3;
+	sint32 value_s32					=	4;
+	uint32 value_u32					=	5;
+	sint64 value_s64					=	6;
+	uint64 value_u64					=	7;
+	bool value_bool						=	8;
+	float value_float					=	9;
+	double value_double					=	10;
+	string value_string					=	11;	// must be UTF-8 encoding
+	bytes value_bytes					=	12;	// 
+	string value_datetime				=	13;
+};
+
+message Entity {
+	uint64 id							=	1;
+	map<string, Value> values			=	2;
+}
+
