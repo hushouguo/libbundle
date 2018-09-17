@@ -15,7 +15,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		u32  shard;
 		char table[16];
 		u64  objectid;
-		size_t size() { return sizeof(*this) + this->datalen; }
+		size_t size() const { return sizeof(*this) + this->datalen; }
 		u32  datalen;
 		char data[0];	// json encoding
 	};
@@ -26,7 +26,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		u32  shard;
 		char table[16];
 		u64  objectid;
-		size_t size() { return sizeof(*this); }
+		size_t size() const { return sizeof(*this); }
 		u32 retval;		// 0: OK, !0: errno
 	};
 
@@ -37,7 +37,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		u32  shard;
 		char table[16];
 		u64  objectid;
-		size_t size() { return sizeof(*this); }
+		size_t size() const { return sizeof(*this); }
 	};
 	
 	struct ObjectUnserializeResponse : public Netmessage {
@@ -46,7 +46,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		u32  shard;
 		char table[16];
 		u64  objectid;
-		size_t size() { return sizeof(*this) + this->datalen; }
+		size_t size() const { return sizeof(*this) + this->datalen; }
 		u32 retval;		// 0: OK, !0: errno
 		u32  datalen;
 		char data[0];	// json encoding
@@ -60,7 +60,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		u32  shard;
 		char table[16];
 		u64  objectid;
-		size_t size() { return sizeof(*this); }
+		size_t size() const { return sizeof(*this); }
 	};
 	
 	struct ObjectDeleteResponse : public Netmessage {
@@ -69,7 +69,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		u32  shard;
 		char table[16];
 		u64  objectid;
-		size_t size() { return sizeof(*this); }
+		size_t size() const { return sizeof(*this); }
 		u32 retval;		// 0: OK, !0: errno
 	};
 
@@ -80,7 +80,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		u32  shard;
 		char table[16];
 		u64  objectid;
-		size_t size() { return sizeof(*this) + this->length; }
+		size_t size() const { return sizeof(*this) + this->length; }
 		u32  length;
 		char where[0];
 	};
@@ -91,7 +91,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		u32  shard;
 		char table[16];
 		u64  objectid;
-		size_t size() { return sizeof(*this) + this->length; }
+		size_t size() const { return sizeof(*this) + this->length; }
 		u32  length;
 		char objects[0];	// json encoding, {"id":"entitydata", "id":"entitydata"}
 	};

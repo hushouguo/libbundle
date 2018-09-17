@@ -15,7 +15,7 @@ GatewayService::GatewayService()
 				if (clientTask) {
 				}
 			},
-			[this](NetworkService* networkService, NetworkInterface* networkInterface, Netmessage* netmsg) -> bool {
+			[this](NetworkService* networkService, NetworkInterface* networkInterface, const Netmessage* netmsg) -> bool {
 				bool rc = this->msgParser(networkInterface, netmsg);
 				if (!rc) {
 					networkService->close(networkInterface);
@@ -33,7 +33,7 @@ bool GatewayService::init() {
 }
 
 DECLARE_MESSAGE();
-bool GatewayService::msgParser(NetworkInterface* task, Netmessage* netmsg) {
+bool GatewayService::msgParser(NetworkInterface* task, const Netmessage* netmsg) {
 	return DISPATCH_MESSAGE(task, netmsg);
 }
 

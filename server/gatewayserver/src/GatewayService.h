@@ -14,7 +14,7 @@ class GatewayService : public NetworkService {
 		bool init();
 
 	private:
-		bool msgParser(NetworkInterface* task, Netmessage* netmsg);
+		bool msgParser(NetworkInterface* task, const Netmessage* netmsg);
 };
 
 #define sGatewayService bundle::Singleton<GatewayService>::getInstance()

@@ -14,7 +14,7 @@ CentralClient::CentralClient()
 				Error << "lost CentralServer";
 				sConfig.syshalt();
 			},
-			[this](NetworkClient* nc, Netmessage* netmsg) -> bool {
+			[this](NetworkClient* nc, const Netmessage* netmsg) -> bool {
 				if (!this->msgParser(nc, netmsg)) { this->stop(); }
 				return true;
 			})
@@ -29,7 +29,7 @@ bool CentralClient::init() {
 }
 
 DECLARE_MESSAGE();
-bool CentralClient::msgParser(NetworkInterface* task, Netmessage* netmsg) {
+bool CentralClient::msgParser(NetworkInterface* task, const Netmessage* netmsg) {
 	return DISPATCH_MESSAGE(task, netmsg);
 }
 

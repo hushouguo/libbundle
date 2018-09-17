@@ -20,7 +20,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	{
 	}
 
-	void RecordClient::serialize(u32 shard, std::string table, u64 objectid, const std::string& js, std::function<void(u32, u32, u64)> func) {
+	void RecordClient::serialize(u32 shard, std::string table, u64 objectid, const std::string& js, std::function<void(u32, std::string, u64, u32)> func) {
 		NEW_MSG(ObjectSerializeRequest, js.length() + sizeof(ObjectSerializeRequest));
 		newmsg->shard = shard;
 		strncpy(newmsg->table, table.c_str(), sizeof(newmsg->table));
@@ -32,7 +32,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		this->_serializeCallbacks.push_back(func);
 	}
 	
-	void RecordClient::unserialize(u32 shard, u32 tableid, u64 objectid, std::function<void(u32, u32, u64, const char*, size_t)> func) {
+	void RecordClient::unserialize(u32 shard, std::string table, u64 objectid, std::function<void(u32, std::string, u64, u32, const char*, size_t)> func) {
 		NEW_MSG(ObjectUnserializeRequest, sizeof(ObjectUnserializeRequest));
 		newmsg->shard = shard;
 		strncpy(newmsg->table, table.c_str(), sizeof(newmsg->table));
@@ -42,28 +42,28 @@ BEGIN_NAMESPACE_BUNDLE {
 		this->_unserializeCallbacks.push_back(func);
 	}
 
-	bool RecordClient::msgParser(NetworkInterface* task, Netmessage* netmsg) {
+	bool RecordClient::msgParser(NetworkInterface* task, const Netmessage* netmsg) {
 		switch (netmsg->id) {
 			case ObjectSerializeResponse::id:
 				if (!this->_serializeCallbacks.empty()) {
-					ObjectSerializeResponse* response = (ObjectSerializeResponse *) netmsg;
+					const ObjectSerializeResponse* response = (const ObjectSerializeResponse *) netmsg;
 					CHECK_RETURN(netmsg->len == response->size(), false, "illegal SerializeResponse");
-					std::function<void(u32, u32, u64)> func = this->_serializeCallbacks.front();
+					std::function<void(u32, std::string, u64, u32)> func = this->_serializeCallbacks.front();
 					this->_serializeCallbacks.pop_front();
 					if (func) {
-						func(response->shard, response->table, response->objectid);
+						func(response->shard, response->table, response->objectid, response->retval);
 					}
 				}
 				break;
 
 			case ObjectUnserializeResponse::id:
 				if (!this->_unserializeCallbacks.empty()) {
-					ObjectUnserializeResponse* response = (ObjectUnserializeResponse *) netmsg;
+					const ObjectUnserializeResponse* response = (const ObjectUnserializeResponse *) netmsg;
 					CHECK_RETURN(netmsg->len == response->size(), false, "illegal UnserializeResponse");
-					std::function<void(u32, u32, u64, const char*, size_t)> func = this->_unserializeCallbacks.front();
+					std::function<void(u32, std::string, u64, u32, const char*, size_t)> func = this->_unserializeCallbacks.front();
 					this->_unserializeCallbacks.pop_front();
 					if (func) {
-						func(response->shard, response->table, response->objectid, response->data, response->datalen);
+						func(response->shard, response->table, response->objectid, response->retval, response->data, response->datalen);
 					}
 				}
 				break;

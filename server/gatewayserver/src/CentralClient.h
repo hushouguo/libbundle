@@ -14,7 +14,7 @@ class CentralClient : public NetworkClient {
 		bool init();
 
 	private:
-		bool msgParser(NetworkInterface* task, Netmessage* netmsg);
+		bool msgParser(NetworkInterface* task, const Netmessage* netmsg);
 };
 
 #define sCentralClient bundle::Singleton<CentralClient>::getInstance()
