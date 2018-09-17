@@ -672,18 +672,6 @@ bool RecordProcess::SlotDatabase::createTable(const char* table, const Entity* e
 	return this->dbhandler->runCommand(sql.str());
 }
 
-static std::map<std::string, std::function<bool(RecordProcess::SlotDatabase*, const char*, const std::string&)>> options = {
-	{ "ADD_KEY",	[](RecordProcess::SlotDatabase* slot, const char* table, const std::string& orgname) -> bool {
-		slot->addKey(table, orgname);
-	}},
-	{ "DROP_KEY",	[](RecordProcess::SlotDatabase* slot, const char* table, const std::string& orgname) -> bool {
-		slot->removeKey(table, orgname);
-	}},
-	{ "DROP_FIELD", [](RecordProcess::SlotDatabase* slot, const char* table, const std::string& orgname) -> bool {
-		slot->removeField(table, orgname);
-	}},
-};
-
 bool RecordProcess::SlotDatabase::alterTable(const char* table, const char* js, size_t length) {
 	rapidjson::Document root;  // Default template parameter uses UTF8 and MemoryPoolAllocator.
 	CHECK_RETURN(root.Parse(js, length).HasParseError() == false, false, "Parse `data` error");
@@ -699,10 +687,22 @@ bool RecordProcess::SlotDatabase::alterTable(const char* table, const char* js, 
 		CHECK_RETURN(value.IsString(), false, "`value` is not string: %d", value.GetType());
 
 		CHECK_RETURN(ContainsKey(desc_fields, name.GetString()), false, "not exist field: %s", name.GetString());
-		CHECK_RETURN(ContainsKey(options, value.GetString()), false, "not support options: %s", value.GetString());
 
 		std::string orgname = value.GetString();
-		options[value.GetString()](this, table, orgname);
+		std::string option = value.GetString();
+		if (option == "ADD_KEY") {
+			this->addKey(table, orgname);
+		}
+		else if (option == "DROP_KEY") {
+			this->removeKey(table, orgname);
+		}
+		else if (option == "DROP_FIELD") {
+			this->removeField(table, orgname);
+		}
+		else {
+			Error << "not support option: " << value.GetString();
+			return false;
+		}
 	}
 	
 	return true;	

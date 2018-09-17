@@ -123,7 +123,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		u32  shard;
 		char table[16];
 		u64  objectid;
-		size_t size() const { return sizeof(*this) + this->length; }
+		size_t size() const { return sizeof(*this); }
 		u32 retval;		// 0: OK, !0: errno
 	};
 #pragma pack(pop)	
