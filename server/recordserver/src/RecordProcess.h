@@ -6,7 +6,7 @@
 #ifndef __RECORD_PROCESS_H__
 #define __RECORD_PROCESS_H__
 
-#define SLOT_HASH_VALUE		sConfig.get("db.slot.value", 8)
+#define SLOT_HASH_VALUE		sConfig.get("db.slot.value", 8u)
 
 class RecordProcess : public Entry<u32, std::string> {
 	public:

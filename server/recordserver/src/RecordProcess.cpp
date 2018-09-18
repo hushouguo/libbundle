@@ -692,16 +692,16 @@ bool RecordProcess::SlotDatabase::alterTable(const char* table, const char* js, 
 
 		CHECK_RETURN(ContainsKey(desc_fields, name.GetString()), false, "not exist field: %s", name.GetString());
 
-		std::string orgname = value.GetString();
+		std::string field = name.GetString();
 		std::string option = value.GetString();
 		if (option == "ADD_KEY") {
-			this->addKey(table, orgname);
+			this->addKey(table, field);
 		}
 		else if (option == "DROP_KEY") {
-			this->removeKey(table, orgname);
+			this->removeKey(table, field);
 		}
 		else if (option == "DROP_FIELD") {
-			this->removeField(table, orgname);
+			this->removeField(table, field);
 		}
 		else {
 			Error << "not support option: " << value.GetString();
