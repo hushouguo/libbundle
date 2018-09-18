@@ -205,7 +205,7 @@ bool RecordProcess::SlotDatabase::init(std::string conf) {
 		rc = this->loadField(table);
 		CHECK_RETURN(rc, false, "load field: %s error", table.c_str());
 	}
-	this->dump();
+	//this->dump();
 
 	SafeDelete(this->threadWorker);
 	this->threadWorker = new std::thread([this]() {
@@ -391,7 +391,15 @@ u32 RecordProcess::SlotDatabase::synchronous() {
 		std::lock_guard<std::mutex> guard(this->rlocker);
 		this->rlist.push_back(response);
 	};
-	
+
+	auto releaseEntity = [this](Entity* entity) {
+		auto iterator = this->entities.find(entity->id);
+		if (iterator != this->entities.end()) {
+			this->entities.erase(iterator);
+		}
+		SafeDelete(entity);
+	};
+
 	while (!this->wlist.empty() && this->wlocker.try_lock()) {
 		Recordmessage* request = this->wlist.front();
 		this->wlist.pop_front();
@@ -406,17 +414,19 @@ u32 RecordProcess::SlotDatabase::synchronous() {
 					Entity* entity = FindOrNull(this->entities, msg->objectid);
 					if (!entity) {
 						entity = new Entity(msg->objectid);
+						this->entities.insert(std::make_pair(msg->objectid, entity));
 					}
+
 					bool rc = entity->ParseFromString(msg->data, msg->datalen);
 					if (!rc) {
+						releaseEntity(entity);
 						sendSerializeResponse(request->s, msg->shard, msg->table, msg->objectid, RECORD_ILLEGAL_JSON_STRING);
 						break;
 					}
 					
 					rc = this->serialize(msg->table, entity);
 					if (!rc) {
-						SafeDelete(entity);
-						this->removeEntity(msg->objectid);
+						releaseEntity(entity);
 						sendSerializeResponse(request->s, msg->shard, msg->table, msg->objectid, RECORD_SERIALIZE_ERROR);
 						break;
 					}
@@ -443,7 +453,7 @@ u32 RecordProcess::SlotDatabase::synchronous() {
 					std::ostringstream o;
 					bool rc = entity->SerializeToString(o, true);
 					if (!rc) {
-						SafeDelete(entity);
+						releaseEntity(entity);
 						sendUnserializeResponse(request->s, msg->shard, msg->table, msg->objectid, RECORD_ILLEGAL_OBJECT, 0, nullptr);
 						break;
 					}
