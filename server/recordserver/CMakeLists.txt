@@ -23,9 +23,11 @@ aux_source_directory(src src)
 link_directories(/usr/lib64) 
 link_directories(/usr/lib64/mysql)
 
+set(CMAKE_EXE_LINKER_FLAGS "-static-libgcc -static-libstdc++")
+
 add_executable(${target} ${src})
 
-target_link_libraries(${target} rt dl pthread)
+target_link_libraries(${target} dl pthread)
 target_link_libraries(${target} ${BUNDLE_DIR}/lib/libbundle.a)
 target_link_libraries(${target} ${PROTOBUF_DIR}/lib/libprotobuf.a)
 target_link_libraries(${target} ${MYSQL_DIR}/lib/libmysqlclient.a)
