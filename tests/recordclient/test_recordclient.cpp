@@ -17,7 +17,7 @@ void test_recordclient(const char* address, int port) {
 	
 	u32 shard = 10;
 	const char* table = "player";
-	u32 count = 1000;
+	u32 count = 10000;
 	std::vector<std::string> v;
 	for (u32 n = 0; n < count; ++n) {
 		std::string nickname;
@@ -35,7 +35,7 @@ void test_recordclient(const char* address, int port) {
 		o << ",\"job\":" << randomBetween(1, 8);
 		o << ",\"exp\":" << randomBetween(1, 10);
 		o << ",\"gold\":" << randomBetween(1, 100);
-		o << ",\"createtime\":" << time_buffer;
+		o << ",\"createtime\":\"" << time_buffer << "\"";
 		o << ",\"strength\":" << randomBetween(1, 10);
 		o << ",\"agility\":" << randomBetween(1, 10);
 		o << ",\"intellect\":" << randomBetween(1, 10);
@@ -50,11 +50,13 @@ void test_recordclient(const char* address, int port) {
 		o << ",\"maxhp\":" << randomBetween(1, 10);
 		o << ",\"maxsp\":" << randomBetween(1, 10);
 		o << ",\"gametime\":" << randomBetween(1, 10);
-		o << ",\"bag\":" << "" << "\"";
-		o << ",\"mailbox\":" << "" << "\"";
-		o << ",\"friendlist\":" << "" << "\"";
+		o << ",\"bag\":\"" << "" << "\"";
+		o << ",\"mailbox\":\"" << "" << "\"";
+		o << ",\"friendlist\":\"" << "" << "\"";
 		o << "}";
 		v.push_back(o.str());
+
+//		Trace << "js: " << o.str();
 	}
 
 	u32 res_ok = 0, res_fail = 0;
