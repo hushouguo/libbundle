@@ -39,7 +39,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	static bool onMessage_raw_##STRUCTURE(NetworkInterface* task, const Netmessage* netmsg);\
 	static void onMessage_##STRUCTURE(NetworkInterface* task, STRUCTURE* msg, const Netmessage* netmsg);\
 	__attribute__((constructor)) static void __##STRUCTURE() {\
-		assert(MSGID >= 0 && MSGID < MAX_MESSAGE_ID);\
+		static_assert(MSGID >= 0 && MSGID < MAX_MESSAGE_ID);\
 		if (__t.table[MSGID]) {\
 			fprintf(stderr, "duplicate message id:%d, %s\n", MSGID, #STRUCTURE);\
 			::abort();\

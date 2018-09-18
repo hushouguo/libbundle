@@ -21,7 +21,7 @@ int main() {
 	//test_xml("../server/recordserver/conf/db.xml");
 	//test_xml2("../server/recordserver/conf/db.xml");
 	//test_easylog();
-	test_recordclient("127.0.0.1", 9990);
+	//test_recordclient("127.0.0.1", 9990);
 	//test_entity();
 	bundle::Easylog::syslog()->stop();
 	return 0;

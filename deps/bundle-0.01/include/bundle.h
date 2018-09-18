@@ -188,19 +188,17 @@
 // rapidjson-1.1.0
 #include "rapidjson-1.1.0/document.h"
 
-typedef uint8_t 						u8;
-typedef uint16_t 						u16;
-typedef uint32_t						u32;
-typedef uint64_t						u64;
-
-typedef int8_t							s8;
-typedef int16_t							s16;
-typedef int32_t 						s32;
-typedef int64_t							s64;
-
+using u8 		= 						uint8_t;
+using u16 		= 						uint16_t;
+using u32		= 						uint32_t;
+using u64		= 						uint64_t;
+using s8		= 						int8_t;
+using s16		= 						int16_t;
+using s32		= 						int32_t;
+using s64		= 						int64_t;
 
 #ifdef PLATFORM_LINUX
-typedef unsigned char					Byte;
+using Byte		= 						unsigned char;
 #endif
 
 #ifdef PLATFORM_WINDOWS
@@ -208,7 +206,7 @@ typedef unsigned char					Byte;
 #define TEMP_FAILURE_RETRY(EXEC)		EXEC
 #define MSG_DONTWAIT					0
 #define MSG_NOSIGNAL					0
-typedef int								ssize_t;
+using ssize_t	=						int;
 #endif
 
 #ifdef PLATFORM_WINDOWS
@@ -220,7 +218,7 @@ typedef int								ssize_t;
 #define BUNDLE_BROADCAST_SOCKET			BUNDLE_INVALID_SOCKET
 
 #if !defined(__cplusplus)
-typedef int								bool;
+using bool		= 						int;
 #define true							1
 #define false							0
 #define nullptr							NULL
