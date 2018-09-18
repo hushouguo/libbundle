@@ -30,7 +30,12 @@ class RecordProcess : public Entry<u32, std::string> {
 			std::list<Recordmessage *> rlist;
 			std::list<Recordmessage *> wlist;
 			std::unordered_map<u64, Entity*> entities;
-			std::unordered_map<std::string, std::unordered_map<std::string, Entity::value_type>> tables;
+			struct FieldDescriptor {
+				enum_field_types type;
+				u32 flags;
+				u64 length;
+			};
+			std::unordered_map<std::string, std::unordered_map<std::string, FieldDescriptor>> tables;
 			SlotDatabase(u32 sid, u32 value) : shard(sid), id(value) {}
 			inline void removeEntity(u64 objectid) {
 				auto i = this->entities.find(objectid);
@@ -44,8 +49,8 @@ class RecordProcess : public Entry<u32, std::string> {
 			u32 synchronous();
 			bool loadField(std::string table);
 			bool createTable(const char* table, const Entity* entity);
-			bool addField(const char* table, const std::string& field_name, Entity::value_type type);
-			bool alterField(const char* table, const std::string& field_name, Entity::value_type type);
+			bool addField(const char* table, const std::string& field_name, enum_field_types field_type);
+			bool alterField(const char* table, const std::string& field_name, enum_field_types field_type);
 			bool serialize(const char* table, const Entity* entity);
 			Entity* unserialize(const char* table, u64 objectid);
 		};		

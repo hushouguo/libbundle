@@ -6,27 +6,37 @@
 #include "global.h"
 #include "protocol/recordserver.h"
 
-// unordered_map MUST gcc version is above 7
-//static std::unordered_map<enum_field_types, Entity::value_type> m2v_signed = {
-static std::map<enum_field_types, Entity::value_type> m2v_signed = {
-	{ MYSQL_TYPE_TINY, Entity::type_bool },
-	{ MYSQL_TYPE_SHORT, Entity::type_integer },
-	{ MYSQL_TYPE_LONG, Entity::type_integer },
-	{ MYSQL_TYPE_LONGLONG, Entity::type_integer },
-	{ MYSQL_TYPE_FLOAT, Entity::type_float },
-	{ MYSQL_TYPE_DOUBLE, Entity::type_float },
-	{ MYSQL_TYPE_VAR_STRING, Entity::type_string },
-	{ MYSQL_TYPE_STRING, Entity::type_string },
-	{ MYSQL_TYPE_VARCHAR, Entity::type_string },
-	{ MYSQL_TYPE_TINY_BLOB, Entity::type_string },
-	{ MYSQL_TYPE_BLOB, Entity::type_string },
-	{ MYSQL_TYPE_MEDIUM_BLOB, Entity::type_string },
-	{ MYSQL_TYPE_LONG_BLOB, Entity::type_string },
-	{ MYSQL_TYPE_DATETIME, Entity::type_string },
+#ifndef IS_UNI_KEY
+#define IS_UNI_KEY(n)	((n) & UNIQUE_KEY_FLAG)
+#endif
+
+#ifndef IS_MUL_KEY
+#define IS_MUL_KEY((n)	((n) & MULTIPLE_KEY_FLAG)
+#endif
+
+#ifndef IS_UNSIGNED
+#define IS_UNSIGNED((n)	((n) & UNSIGNED_FLAG)
+#endif
+
+
+static std::map<enum_field_types, const char*> m2string = {
+	{ MYSQL_TYPE_TINY, "TINYINT UNSIGNED" },
+	{ MYSQL_TYPE_SHORT, "SMALLINT" },
+	{ MYSQL_TYPE_LONG, "INT" },
+	{ MYSQL_TYPE_LONGLONG, "BIGINT" },
+	{ MYSQL_TYPE_FLOAT, "FLOAT" },
+	{ MYSQL_TYPE_DOUBLE, "DOUBLE" },		
+	{ MYSQL_TYPE_VAR_STRING, "VARCHAR" },
+	{ MYSQL_TYPE_STRING, "VARCHAR" },
+	{ MYSQL_TYPE_VARCHAR, "VARCHAR" },
+	{ MYSQL_TYPE_TINY_BLOB, "TINYBLOB" },
+	{ MYSQL_TYPE_BLOB, "TEXT" },
+	{ MYSQL_TYPE_MEDIUM_BLOB, "MEDIUMTEXT" },
+	{ MYSQL_TYPE_LONG_BLOB, "LONGTEXT" },
+	{ MYSQL_TYPE_DATETIME, "VARCHAR" },
 };
 
-//static std::unordered_map<enum_field_types, Entity::value_type> m2v_unsigned = {
-static std::map<enum_field_types, Entity::value_type> m2v_unsigned = {
+static std::map<enum_field_types, Entity::value_type> m2v = {
 	{ MYSQL_TYPE_TINY, Entity::type_bool },
 	{ MYSQL_TYPE_SHORT, Entity::type_integer },
 	{ MYSQL_TYPE_LONG, Entity::type_integer },
@@ -43,15 +53,31 @@ static std::map<enum_field_types, Entity::value_type> m2v_unsigned = {
 	{ MYSQL_TYPE_DATETIME, Entity::type_string },		
 };
 
-//static std::unordered_map<Entity::value_type, std::string> v2m = {
-static std::map<Entity::value_type, std::string> v2m = {
-	{ Entity::type_integer, "BIGINT SIGNED" },
-	{ Entity::type_bool, "TINYINT UNSIGNED" },
-	{ Entity::type_float, "FLOAT" },
-	{ Entity::type_string, "TEXT" }	// VARCHAR: max: 21845 utf-8, auto-expand
+static std::map<Entity::value_type, std::function<enum_field_types(Entity::Value&)>> v2m = {
+	{ Entity::type_integer, [](Entity::Value& value) {
+		assert(value.type == Entity::type_integer);
+		return (value.value_integer > INT32_MAX || value.value_integer < INT32_MIN) > MYSQL_TYPE_LONGLONG : MYSQL_TYPE_LONG;
+	}},
+	
+	{ Entity::type_bool, [](Entity::Value& value) {
+		assert(value.type == Entity::type_bool);
+		return MYSQL_TYPE_TINY;
+	}},
+	
+	{ Entity::type_float, [](Entity::Value& value) {
+		assert(value.type == Entity::type_float);
+		return MYSQL_TYPE_FLOAT;
+	}},	
+	
+	{ Entity::type_string, [](Entity::Value& value) {
+		assert(value.type == Entity::type_string);
+		return value.value_string.length() > 65535 ? MYSQL_TYPE_LONG_BLOB 
+				: (value.value_string.length() > 21000 ? MYSQL_TYPE_BLOB : MYSQL_TYPE_VARCHAR);
+	}}
 };
 
-static std::map<enum_field_types, std::function<void(Entity::Value&, std::string, bool)>> m2v = {
+
+static std::map<enum_field_types, std::function<void(Entity::Value&, std::string, bool)>> m2value = {
 	{ MYSQL_TYPE_TINY, [](Entity::Value& value, std::string s, bool is_unsigned) {	// bool
 		value = std::stoi(s) != 0;
 	}},
@@ -144,34 +170,35 @@ bool RecordProcess::SlotDatabase::init(std::string conf) {
 }
 
 bool RecordProcess::SlotDatabase::loadField(std::string table) {
-	std::unordered_map<std::string, Entity::value_type>& desc_fields = this->tables[table];
+	std::unordered_map<std::string, FieldDescriptor>& desc_fields = this->tables[table];
 
-	char sql[64];
-	snprintf(sql, sizeof(sql), "SELECT * FROM `%s` LIMIT 1", table.c_str());
+	std::ostringostream sql;
+	sql << "SELECT * FROM `" << table.c_str() << "` LIMIT 1";
 	
-	MySQLResult* result = this->dbhandler->runQuery(sql);
+	MySQLResult* result = this->dbhandler->runQuery(sql.str());
 	assert(result);
 	u32 fieldNumber = result->fieldNumber();
 	MYSQL_FIELD* fields = result->fetchField();
 	for (u32 i = 0; i < fieldNumber; ++i) {
 		const MYSQL_FIELD& field = fields[i];
-		CHECK_CONTINUE(desc_fields.find(field.org_name) == desc_fields.end(), "duplicate org_name: %s, table: %s", field.org_name, table.c_str());
-		bool is_unsigned = (field.flags & UNSIGNED_FLAG) != 0;			
-		if (is_unsigned) {
-			CHECK_CONTINUE(m2v_unsigned.find(field.type) != m2v_unsigned.end(), "illegal table:%s, field: %s, type: %d", table.c_str(), field.org_name, field.type);
-			desc_fields[field.org_name] = m2v_unsigned[field.type];
-		}
-		else {
-			CHECK_CONTINUE(m2v_signed.find(field.type) != m2v_signed.end(), "illegal table:%s, field: %s, type: %d", table.c_str(), field.org_name, field.type);
-			desc_fields[field.org_name] = m2v_signed[field.type];
-		}
+		//CHECK_CONTINUE(desc_fields.find(field.org_name) == desc_fields.end(), "duplicate org_name: %s, table: %s", field.org_name, table.c_str());
+		FieldDescriptor& fieldDescriptor = desc_fields[field.org_name];
+		fieldDescriptor.type = field.type;
+		fieldDescriptor.flags = field.flags;
+		fieldDescriptor.length = field.length;
 	}
 	SafeDelete(result);
 
 	auto dump = [&desc_fields](u32 shard, const std::string& table) {
 		Trace << "shard: " << shard << ", table: " << table;
 		for (auto& i : desc_fields) {
-			Trace << "FIELD: " << i.first << " => " << Entity::ValueTypeName(i.second);
+			const FieldDescriptor& fieldDescriptor = i.second;			
+			Trace << "FIELD: " << i.first << " => " << fieldDescriptor.type 
+				<< (IS_PRI_KEY(fieldDescriptor.flags) ? " PRI" : "")
+				<< (IS_NOT_NULL(fieldDescriptor.flags) ? " NOT NULL" : "")
+				<< (IS_UNI_KEY(fieldDescriptor.flags) ? " UNIQUE" : "")
+				<< (IS_MUL_KEY(fieldDescriptor.flags) ? " MUL" : "")
+				<< (IS_UNSIGNED(fieldDescriptor.flags) ? " UNSIGNED" : "");
 		}
 	};
 	dump(this->shard, table);
@@ -229,9 +256,13 @@ void RecordProcess::SlotDatabase::stop() {
 			this->threadWorker->join();
 		}
 		SafeDelete(this->threadWorker);
+		for (auto& i : this->entities) {
+			Entity* entity = i.second;
+			//TODO: write to db ??
+			SafeDelete(entity);
+		}
+		this->entities.clear();
 		SafeDelete(this->dbhandler);
-		//TODO: remove Recordmessage
-		//TODO: remove entities
 	}
 }
 
@@ -358,7 +389,7 @@ u32 RecordProcess::SlotDatabase::synchronous() {
 }
 
 bool RecordProcess::SlotDatabase::serialize(const char* table, const Entity* entity) {
-	std::unordered_map<std::string, Entity::value_type>& desc_fields = this->tables[table];
+	std::unordered_map<std::string, FieldDescriptor>& desc_fields = this->tables[table];
 
 	if (!ContainsKey(this->tables, table)) {
 		bool rc = this->createTable(table, entity);
@@ -371,18 +402,24 @@ bool RecordProcess::SlotDatabase::serialize(const char* table, const Entity* ent
 
 	std::ostringstream sql_fields, sql_insert, sql_update;
 	for (auto& iterator : values) {
+		const Entity::Value& value = iterator.second;
+		CHECK_CONTINUE(v2m.find(value.type) != v2m.end(), "illegal ValueType: %d", value.type); 		
+		enum_field_types field_type = v2m[value.type](value);
+
+		// add field
 		if (!ContainsKey(desc_fields, iterator.first)) {
-			bool rc = this->addField(table, iterator.first, iterator.second.type);
-			CHECK_RETURN(rc, false, "add new field: %s, type: %d error", iterator.first.c_str(), iterator.second.type);
-			desc_fields[iterator.first] = iterator.second.type;
-			Trace << "table: " << table << ", add new field: " << iterator.first << ", type: " << Entity::ValueTypeName(iterator.second.type);
+			bool rc = this->addField(table, iterator.first, field_type);
+			CHECK_RETURN(rc, false, "add new field: %s, type: %d error", iterator.first.c_str(), value.type);
+			this->loadField(table);
+			Trace << "table: " << table << ", add new field: " << iterator.first << ", type: " << Entity::ValueTypeName(value.type);
 		}
-		
-		if (iterator.second.type != desc_fields[iterator.first]) {
-			bool rc = this->alterField(table, iterator.first, iterator.second.type);
-			CHECK_RETURN(rc, false, "modify field: %s to new type: %d error", iterator.first.c_str(), iterator.second.type);
-			Trace << "table: " << table << ", modify field: " << iterator.first << ", from type: " << Entity::ValueTypeName(desc_fields[iterator.first]) << " to new type: " << Entity::ValueTypeName(iterator.second.type);
-			desc_fields[iterator.first] = iterator.second.type;
+
+		// modify field		
+		if (field_type != desc_fields[iterator.first].type) {
+			bool rc = this->alterField(table, iterator.first, field_type);
+			CHECK_RETURN(rc, false, "modify field: %s to new type: %d error", iterator.first.c_str(), value.type);
+			this->loadField(table);
+			Trace << "table: " << table << ", modify field: " << iterator.first << " to new type: " << Entity::ValueTypeName(value.type);
 		}
 	
 		if (sql_fields.tellp() > 0) { sql_fields << ","; }
@@ -391,50 +428,45 @@ bool RecordProcess::SlotDatabase::serialize(const char* table, const Entity* ent
 
 		sql_fields << "`" << iterator.first << "`";
 
-		switch (iterator.second.type) {
+		switch (value.type) {
 			case Entity::type_integer: 
-				sql_insert << iterator.second.value_integer;
-				sql_update << "`" << iterator.first << "`=" << iterator.second.value_integer;
+				sql_insert << value.value_integer;
+				sql_update << "`" << iterator.first << "`=" << value.value_integer;
 				break;
 
 			case Entity::type_float:
-				sql_insert << iterator.second.value_float;
-				sql_update << "`" << iterator.first << "`=" << iterator.second.value_float;
+				sql_insert << value.value_float;
+				sql_update << "`" << iterator.first << "`=" << value.value_float;
 				break;
 
 			case Entity::type_bool:
-				sql_insert << iterator.second.value_bool;
-				sql_update << "`" << iterator.first << "`=" << iterator.second.value_bool;
+				sql_insert << value.value_bool;
+				sql_update << "`" << iterator.first << "`=" << value.value_bool;
 				break;
 
 			case Entity::type_string:
-				sql_insert << "'" << iterator.second.value_string << "'";
-				sql_update << "`" << iterator.first << "`=" << "'" << iterator.second.value_string << "'";
+				sql_insert << "'" << value.value_string << "'";
+				sql_update << "`" << iterator.first << "`=" << "'" << value.value_string << "'";
 				break;
 
-			default: CHECK_RETURN(false, false, "illegal value type: %d", iterator.second.type); break;
+			default: CHECK_RETURN(false, false, "illegal value type: %d", value.type); break;
 		}
 	}
-	
-	std::string sql = "INSERT INTO `";
-	sql += table;
-	sql += "` (";
-	sql += sql_fields.str() + ") VALUES (";
-	sql += sql_insert.str() + ") ON DUPLICATE KEY UPDATE ";
-	sql += sql_update.str();
 
+	std::ostreamstream sql;
+	sql << "INSERT INTO `" << table << "` (" << sql_fields.str() << ") VALUES (" << sql_insert.str();
+	sql << ") ON DUPLICATE KEY UPDATE " << sql_update.str();
 	Trace << "serialize sql: " << sql;
-
-	return this->dbhandler->runCommand(sql);
+	return this->dbhandler->runCommand(sql.str());
 }
 
 Entity* RecordProcess::SlotDatabase::unserialize(const char* table, u64 objectid) {
-	std::unordered_map<std::string, Entity::value_type>& desc_fields = this->tables[table];
+	std::unordered_map<std::string, FieldDescriptor>& desc_fields = this->tables[table];
 
-	char sql[64];
-	snprintf(sql, sizeof(sql), "SELECT * FROM `%s` WHERE id = %ld", table, objectid);
+	std::ostringstream sql;
+	sql << "SELECT * FROM `" << table << "` WHERE id = " << objectid;
 
-	MySQLResult* result = this->dbhandler->runQuery(sql);
+	MySQLResult* result = this->dbhandler->runQuery(sql.str());
 	if (!result) {
 		return nullptr;
 	}
@@ -458,10 +490,10 @@ Entity* RecordProcess::SlotDatabase::unserialize(const char* table, u64 objectid
 	for (u32 i = 0; i < fieldNumber; ++i) {
 		const MYSQL_FIELD& field = fields[i];
 		CHECK_CONTINUE(desc_fields.find(field.org_name) != desc_fields.end(), "org_name: %s not exist, table: %s", field.org_name, table);
-		CHECK_CONTINUE(ContainsKey(m2v, field.type), "unhandle field.type: %d", field.type);
-		bool is_unsigned = (field.flags & UNSIGNED_FLAG) != 0;
+		CHECK_CONTINUE(ContainsKey(m2value, field.type), "unhandle field.type: %d", field.type);
+		bool is_unsigned = IS_UNSIGNED(field.flags);
 		try {
-			m2v[field.type](entity->GetValue(field.org_name), row[i], is_unsigned);
+			m2value[field.type](entity->GetValue(field.org_name), row[i], is_unsigned);
 		} catch(std::exception& e) {
 			Error << "field: " << field.org_name << ", type: " << field.type << " convert error: " << e.what();
 		}
@@ -471,36 +503,36 @@ Entity* RecordProcess::SlotDatabase::unserialize(const char* table, u64 objectid
 	return entity;
 }
 
-bool RecordProcess::SlotDatabase::addField(const char* table, const std::string& field_name, Entity::value_type type) {
+bool RecordProcess::SlotDatabase::addField(const char* table, const std::string& field_name, enum_field_types field_type) {
+	CHECK_CONTINUE(m2string.find(field_type) != m2string.end(), "illegal field type: %d", field_type);		
 	std::ostringstream sql;
-	sql << "ALTER TABLE `" << table << "` ADD `" << field_name << "` " << v2m[type];
+	sql << "ALTER TABLE `" << table << "` ADD `" << field_name << "` " << m2string[field_type] << " NOT NULL";
 	Trace << "alter table: " << sql.str();
 	return this->dbhandler->runCommand(sql.str());
 }
 
-bool RecordProcess::SlotDatabase::alterField(const char* table, const std::string& field_name, Entity::value_type type) {
+bool RecordProcess::SlotDatabase::alterField(const char* table, const std::string& field_name, enum_field_types field_type) {
+	CHECK_CONTINUE(m2string.find(field_type) != m2string.end(), "illegal field type: %d", field_type);		
 	std::ostringstream sql;
-	sql << "ALTER TABLE `" << table << "` MODIFY `" << field_name << "` " << v2m[type] << " NOT NULL ";
+	sql << "ALTER TABLE `" << table << "` MODIFY `" << field_name << "` " << m2string[field_type] << " NOT NULL";
 	Trace << "alter table: " << sql.str();
 	return this->dbhandler->runCommand(sql.str());
 }
 
 bool RecordProcess::SlotDatabase::createTable(const char* table, const Entity* entity) {
 	const std::unordered_map<std::string, Entity::Value>& values = entity->values();
-	std::string sql = "CREATE TABLE `"; // IF NOT EXISTS
-	sql += table;
-	sql += "` (`id` BIGINT UNSIGNED NOT NULL PRIMARY KEY ";	// entity->id
+	std::ostreamstream sql;
+	sql << "CREATE TABLE `" << table << "` (`id` BIGINT UNSIGNED NOT NULL PRIMARY KEY ";
 	for (auto& iterator : values) {
+		const Entity::Value& value = iterator.second;
 		if (iterator.first == "id") { continue; }
-		CHECK_CONTINUE(v2m.find(iterator.second.type) != v2m.end(), "illegal ValueType: %d", iterator.second.type);
-		sql += ", `";
-		sql += iterator.first + "` ";
-		sql += v2m[iterator.second.type] + " NOT NULL ";	//TODO: KEY setting		
+		CHECK_CONTINUE(v2m.find(value.type) != v2m.end(), "illegal ValueType: %d", value.type);
+		enum_field_types field_type = v2m[value.type](value);
+		CHECK_CONTINUE(m2string.find(field_type) != m2string.end(), "illegal field type: %d", field_type);		
+		sql << ", `" << iterator.first << "` " << m2string[field_type] + " NOT NULL";	//TODO: KEY setting
 	}
-	sql += ") ENGINE=InnoDB DEFAULT CHARSET=utf8 ";
-
-	Trace << "createTable: " << sql;
-
-	return this->dbhandler->runCommand(sql);
+	sql >> ") ENGINE=InnoDB DEFAULT CHARSET=utf8";
+	Trace << "createTable: " << sql.str();
+	return this->dbhandler->runCommand(sql.str());
 }
 
