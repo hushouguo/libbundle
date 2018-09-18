@@ -13,7 +13,7 @@ RecordService::RecordService()
 			nullptr,
 			[](NetworkService*, NetworkInterface* networkInterface) {
 			},
-			[this](NetworkService* networkService, NetworkInterface* networkInterface, Netmessage* netmsg) -> bool {
+			[this](NetworkService* networkService, NetworkInterface* networkInterface, const Netmessage* netmsg) -> bool {
 				bool rc = this->msgParser(networkInterface, netmsg);
 				if (!rc) {
 					networkService->close(networkInterface);
@@ -31,13 +31,13 @@ bool RecordService::init() {
 			);
 }
 
-bool RecordService::msgParser(NetworkInterface* task, Netmessage* netmsg) {
+bool RecordService::msgParser(NetworkInterface* task, const Netmessage* netmsg) {
 	switch (netmsg->id) {
 		case ObjectSerializeRequest::id:
 			if (true) {
 				ObjectSerializeRequest* request = (ObjectSerializeRequest*) netmsg;
 				CHECK_RETURN(netmsg->len == request->size(), false, "illegal SerializeRequest message:%u, %lu", netmsg->len, request->size());
-				return sRecordProcessManager.request(request->shard, request->tableid, request->objectid, task->fd(), netmsg);
+				return sRecordProcessManager.request(request->shard, request->objectid, task->fd(), netmsg);
 			}
 			break;
 
@@ -45,7 +45,7 @@ bool RecordService::msgParser(NetworkInterface* task, Netmessage* netmsg) {
 			if (true) {
 				ObjectUnserializeRequest* request = (ObjectUnserializeRequest*) netmsg;
 				CHECK_RETURN(netmsg->len == request->size(), false, "illegal UnserializeRequest message:%u, %lu", netmsg->len, request->size());
-				return sRecordProcessManager.request(request->shard, request->tableid, request->objectid, task->fd(), netmsg);
+				return sRecordProcessManager.request(request->shard, request->objectid, task->fd(), netmsg);
 			}
 			break;
 

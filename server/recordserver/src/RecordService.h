@@ -14,7 +14,7 @@ class RecordService : public NetworkService {
 		bool init();
 
 	private:
-		bool msgParser(NetworkInterface* task, Netmessage* netmsg);
+		bool msgParser(NetworkInterface* task, const Netmessage* netmsg);
 };
 
 #define sRecordService bundle::Singleton<RecordService>::getInstance()

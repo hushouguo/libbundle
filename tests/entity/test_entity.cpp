@@ -8,7 +8,7 @@
 using namespace bundle;
 
 void test_entity() {
-	Entity entity(1, 2);
+	Entity entity(1);
 	entity["u8"] = 1;
 	entity["s8"] = -1;
 	entity["u32"] = 100;
@@ -28,7 +28,7 @@ void test_entity() {
 	assert(rc);
 	Trace << "o: " << o.str();
 
-	Entity entity2(2, 2);
+	Entity entity2(2);
 	rc = entity2.ParseFromString(o.str().c_str(), o.str().length());
 	assert(rc);
 	Trace << "dump entity2:";

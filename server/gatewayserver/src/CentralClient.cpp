@@ -35,7 +35,7 @@ bool CentralClient::msgParser(NetworkInterface* task, const Netmessage* netmsg) 
 
 
 //Note: ON_MSG(MSGID, STRUCTURE) 
-//		ON_MSG(NetworkInterface* task, STRUCTURE* msg, Netmessage* netmsg)
+//		ON_MSG(NetworkInterface* task, const STRUCTURE* msg, const Netmessage* netmsg)
 //
 
 

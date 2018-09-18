@@ -6,13 +6,11 @@
 #include "global.h"
 #include "protocol/recordserver.h"
 
-Recordmessage::Recordmessage(SOCKET s, Netmessage* netmsg) {
+Recordmessage::Recordmessage(SOCKET s, const Netmessage* netmsg) {
 	this->s = s;
 	this->netmsg = netmsg;
 }
 
 Recordmessage::~Recordmessage() {
-	assert(this->netmsg);
-	sRecordService.releaseMessage(this->netmsg);
 }
 

@@ -46,7 +46,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		switch (netmsg->id) {
 			case ObjectSerializeResponse::id:
 				if (!this->_serializeCallbacks.empty()) {
-					const ObjectSerializeResponse* response = (const ObjectSerializeResponse *) netmsg;
+					ObjectSerializeResponse* response = (ObjectSerializeResponse *) netmsg;
 					CHECK_RETURN(netmsg->len == response->size(), false, "illegal SerializeResponse");
 					std::function<void(u32, std::string, u64, u32)> func = this->_serializeCallbacks.front();
 					this->_serializeCallbacks.pop_front();
@@ -58,7 +58,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 			case ObjectUnserializeResponse::id:
 				if (!this->_unserializeCallbacks.empty()) {
-					const ObjectUnserializeResponse* response = (const ObjectUnserializeResponse *) netmsg;
+					ObjectUnserializeResponse* response = (ObjectUnserializeResponse *) netmsg;
 					CHECK_RETURN(netmsg->len == response->size(), false, "illegal UnserializeResponse");
 					std::function<void(u32, std::string, u64, u32, const char*, size_t)> func = this->_unserializeCallbacks.front();
 					this->_unserializeCallbacks.pop_front();

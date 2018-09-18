@@ -6,22 +6,6 @@
 #include "global.h"
 #include "protocol/recordserver.h"
 
-#define DATABASE_PREFIX			"shard."
-#define DATABASE_POSTFIX		""
-#define TABLE_PREFIX			"table."
-#define TABLE_POSTFIX			""
-
-#define DATABASE_NAME(shard)	\
-	({ 	char database[64];\
-		snprintf(database, sizeof(database), "%s%u%s", DATABASE_PREFIX, shard, DATABASE_POSTFIX);\
-		database;})
-
-#define TABLE_NAME(tableid, hashid)	\
-	({	char tablename[64];\
-		snprintf(tablename, sizeof(tablename), "%s%u.%u%s", TABLE_PREFIX, tableid, hashid, TABLE_POSTFIX);\
-		tablename;})
-
-
 // unordered_map MUST gcc version is above 7
 //static std::unordered_map<enum_field_types, Entity::value_type> m2v_signed = {
 static std::map<enum_field_types, Entity::value_type> m2v_signed = {
@@ -67,6 +51,50 @@ static std::map<Entity::value_type, std::string> v2m = {
 	{ Entity::type_string, "VARCHAR" }	// max: 21845 utf-8, auto-expand
 };
 
+static std::map<enum_field_types, std::function<void(Entity::Value&, std::string, bool)>> m2v = {
+	{ MYSQL_TYPE_TINY, [](Entity::Value& value, std::string s, bool is_unsigned) {	// bool
+		value = std::stoi(s) != 0;
+	}},
+	{ MYSQL_TYPE_SHORT, [](Entity::Value& value, std::string s, bool is_unsigned) { // integer
+		value = std::stoi(s);
+	}},
+	{ MYSQL_TYPE_LONG, [](Entity::Value& value, std::string s, bool is_unsigned) { 	// integer
+		value = is_unsigned ? std::stoul(s) : std::stol(s);
+	}},
+	{ MYSQL_TYPE_LONGLONG, [](Entity::Value& value, std::string s, bool is_unsigned) { // integer
+		value = is_unsigned ? (u64)std::stoull(s) : (s64)std::stoll(s);
+	}},
+	{ MYSQL_TYPE_FLOAT, [](Entity::Value& value, std::string s, bool is_unsigned) { // float
+		value = std::stof(s);
+	}},
+	{ MYSQL_TYPE_DOUBLE, [](Entity::Value& value, std::string s, bool is_unsigned) { // float
+		value = std::stod(s);
+	}},		
+	{ MYSQL_TYPE_VAR_STRING, [](Entity::Value& value, std::string s, bool is_unsigned) { // string
+		value = s;
+	}},
+	{ MYSQL_TYPE_STRING, [](Entity::Value& value, std::string s, bool is_unsigned) { // string
+		value = s;
+	}},
+	{ MYSQL_TYPE_VARCHAR, [](Entity::Value& value, std::string s, bool is_unsigned) { // string
+		value = s;
+	}},
+	{ MYSQL_TYPE_TINY_BLOB, [](Entity::Value& value, std::string s, bool is_unsigned) { // string
+		value = s;
+	}},
+	{ MYSQL_TYPE_BLOB, [](Entity::Value& value, std::string s, bool is_unsigned) { // string
+		value = s;
+	}},
+	{ MYSQL_TYPE_MEDIUM_BLOB, [](Entity::Value& value, std::string s, bool is_unsigned) { // string
+		value = s;
+	}},
+	{ MYSQL_TYPE_LONG_BLOB, [](Entity::Value& value, std::string s, bool is_unsigned) { // string
+		value = s;
+	}},
+	{ MYSQL_TYPE_DATETIME, [](Entity::Value& value, std::string s, bool is_unsigned) { // string
+		value = s;
+	}},
+};
 
 RecordProcess::RecordProcess(u32 shard, const char* name)
 	: Entry<u32, std::string>(shard, name) {
@@ -76,49 +104,53 @@ bool RecordProcess::SlotDatabase::init(std::string conf) {
 	this->dbhandler = new MySQL();
 	bool rc = this->dbhandler->openDatabase(conf);
 	CHECK_RETURN(rc, false, "conf: %s error", conf.c_str());
+
+	char database[64];
+	snprintf(database, sizeof(database), "shard_%u_%u", this->shard, this->id);
 	
 	//load databases
 	std::set<std::string> results;
-	rc = this->dbhandler->loadDatabase(DATABASE_PREFIX, DATABASE_POSTFIX, results);
+	rc = this->dbhandler->loadDatabase(database, results);
 	CHECK_RETURN(rc, false, "load database error");
 	
 	//create database
-	std::string database = DATABASE_NAME(this->id);
 	if (results.find(database) == results.end()) {
 		rc = this->dbhandler->createDatabase(database);
-		CHECK_RETURN(rc, false, "create database: %s error", database.c_str());
+		CHECK_RETURN(rc, false, "create database: %s error", database);
 		System << "create database: " << database << " OK";
 	}
 	
 	//select database
 	rc = this->dbhandler->selectDatabase(database);
-	CHECK_RETURN(rc, false, "select database: %s error", database.c_str());
-	
-#if 0
+	CHECK_RETURN(rc, false, "select database: %s error", database);
+
 	//load table
 	results.clear();
-	rc = this->dbhandler->loadTable(TABLE_PREFIX, TABLE_POSTFIX, results);
-	CHECK_RETURN(rc, false, "load table: %s error", database.c_str());
+	rc = this->dbhandler->loadTable("%", results);
+	CHECK_RETURN(rc, false, "load table from database: %s error", database);
 	
 	//load fields decription
 	for (auto& table : results) {
-		rc = this->loadField(this->id, table);
+		rc = this->loadField(table);
 		CHECK_RETURN(rc, false, "load field: %s error", table.c_str());
 	}
-#endif
 
-	//TODO: create thread
+	SafeDelete(this->threadWorker);
+	this->threadWorker = new std::thread([this]() {
+		this->update();
+	});
 	
 	return true;
 }
 
-#if 0
-bool RecordProcess::SlotDatabase::loadField(u32 shard, std::string table) {
-	std::unordered_map<std::string, Entity::value_type>& desc_fields = this->_tables[table];
+bool RecordProcess::SlotDatabase::loadField(std::string table) {
+	std::unordered_map<std::string, Entity::value_type>& desc_fields = this->tables[table];
+
+	char sql[64];
+	snprintf(sql, sizeof(sql), "SELECT * FROM `%s` LIMIT 1", table.c_str());
 	
-	std::string s = "SELECT * FROM `";
-	s += table + "` LIMIT 1";
-	MySQLResult* result = this->_dbhandler->runQuery(s);
+	MySQLResult* result = this->dbhandler->runQuery(sql);
+	assert(result);
 	u32 fieldNumber = result->fieldNumber();
 	MYSQL_FIELD* fields = result->fetchField();
 	for (u32 i = 0; i < fieldNumber; ++i) {
@@ -136,23 +168,21 @@ bool RecordProcess::SlotDatabase::loadField(u32 shard, std::string table) {
 	}
 	SafeDelete(result);
 
-	auto dump = [shard, table, &desc_fields]() {
+	auto dump = [&desc_fields](u32 shard, const std::string& table) {
 		Trace << "shard: " << shard << ", table: " << table;
 		for (auto& i : desc_fields) {
 			Trace << "FIELD: " << i.first << " => " << Entity::ValueTypeName(i.second);
 		}
 	};
-	dump();
+	dump(this->shard, table);
 	
 	return true;
 }
 
-#endif
-
 bool RecordProcess::init(const std::vector<std::string>& v) {
 	assert(v.size() == 8);
 	for (auto& conf : v) {
-		SlotDatabase* slotDatabase = new SlotDatabase(this->_slots.size());
+		SlotDatabase* slotDatabase = new SlotDatabase(this->id, this->_slots.size());
 		CHECK_RETURN(slotDatabase->init(conf), false, "init conf: %s error", conf.c_str());
 		this->_slots.push_back(slotDatabase);
 	}
@@ -161,7 +191,7 @@ bool RecordProcess::init(const std::vector<std::string>& v) {
 }
 
 
-bool RecordProcess::request(u32 shard, u32 tableid, u64 objectid, SOCKET s, Netmessage* netmsg) {
+bool RecordProcess::request(u32 shard, u64 objectid, SOCKET s, const Netmessage* netmsg) {
 	assert(shard == this->id);
 	u32 hashid = objectid % 8;
 	assert(hashid < this->_slots.size());
@@ -187,13 +217,9 @@ void RecordProcess::update(SlotDatabase* slotDatabase) {
 		if (networkInterface) {
 			networkInterface->sendMessage(response->netmsg);
 		}
+		SafeFree(response->netmsg);
 		SafeDelete(response);
 	}
-}
-
-void RecordProcess::SlotDatabase::response(SOCKET s, Netmessage* netmsg) {
-	std::lock_guard<std::mutex> guard(this->rlocker);
-	this->rlist.push_back(new Recordmessage(s, netmsg));
 }
 
 void RecordProcess::SlotDatabase::stop() {
@@ -226,7 +252,39 @@ void RecordProcess::SlotDatabase::update() {
 	System.cout("recordProcess: %d thread exit", this->id);
 }
 
+
 u32 RecordProcess::SlotDatabase::synchronous() {
+	auto sendSerializeResponse = [this](SOCKET s, u32 shard, const char* table, u64 objectid, u32 retval) {
+		ObjectSerializeResponse* newmsg = Constructor((ObjectSerializeResponse *)(::malloc(sizeof(ObjectSerializeResponse))));
+		Recordmessage* response = new Recordmessage(s, newmsg);
+		newmsg->shard = shard;
+		strncpy(newmsg->table, table, sizeof(newmsg->table));
+		newmsg->objectid = objectid;
+		newmsg->retval = retval;
+		newmsg->len = newmsg->size();
+		
+		std::lock_guard<std::mutex> guard(this->rlocker);
+		this->rlist.push_back(response);
+	};
+
+	auto sendUnserializeResponse = [this](SOCKET s, u32 shard, const char* table, u64 objectid, u32 retval, u32 datalen, const char* data) {
+		ObjectUnserializeResponse* newmsg = Constructor((ObjectUnserializeResponse *)(::malloc(sizeof(ObjectUnserializeResponse) + datalen)));
+		Recordmessage* response = new Recordmessage(s, newmsg);
+		newmsg->shard = shard;
+		strncpy(newmsg->table, table, sizeof(newmsg->table));
+		newmsg->objectid = objectid;
+		newmsg->retval = retval;
+		newmsg->datalen = datalen;
+		if (data) {
+			assert(datalen > 0);
+			memcpy(newmsg->data, data, datalen);
+		}
+		newmsg->len = newmsg->size();
+		
+		std::lock_guard<std::mutex> guard(this->rlocker);
+		this->rlist.push_back(response);
+	};
+	
 	while (!this->wlist.empty() && this->wlocker.try_lock()) {
 		Recordmessage* request = this->wlist.front();
 		this->wlist.pop_front();
@@ -235,90 +293,165 @@ u32 RecordProcess::SlotDatabase::synchronous() {
 		switch (request->netmsg->id) {
 			case ObjectSerializeRequest::id:
 				if (true) {
-					//ObjectSerializeRequest* msg = (ObjectSerializeRequest*) request->netmsg;
-					//assert(msg->shard == this->id);
-#if 0					
-					TABLE_NAME(msg->tableid);
-					if (!ContainsKey(this->_tables, tablename)) {
+					ObjectSerializeRequest* msg = (ObjectSerializeRequest*) request->netmsg;					
+					assert(msg->shard == this->shard);
+
+					Entity* entity = FindOrNull(this->entities, msg->objectid);
+					if (!entity) {
+						entity = new Entity(msg->objectid);
+					}
+					bool rc = entity->ParseFromString(msg->data, msg->datalen);
+					if (!rc) {
+						sendSerializeResponse(request->s, msg->shard, msg->table, msg->objectid, RECORD_ILLEGAL_JSON_STRING);
+						break;
 					}
 					
-					Entity* entity = FindOrNull(this->_entities, msg->objectid);
-					if (entity) {
+					rc = this->serialize(msg->table, entity);
+					if (!rc) {
+						SafeDelete(entity);
+						this->removeEntity(msg->objectid);
+						sendSerializeResponse(request->s, msg->shard, msg->table, msg->objectid, RECORD_SERIALIZE_ERROR);
+						break;
 					}
-					else {
-					}
-#endif
-					//NEW_MSG(ObjectSerializeResponse, sizeof(ObjectSerializeResponse));
-					//newmsg->len = sizeof(ObjectSerializeResponse);
-					//newmsg->shard = msg->shard;
-					//newmsg->tableid = msg->tableid;
-					//newmsg->objectid = msg->objectid;
-					//this->response(request->s, newmsg, request->opcode);
+
+					sendSerializeResponse(request->s, msg->shard, msg->table, msg->objectid, RECORD_OK);
 				}
 				break;
 
 			case ObjectUnserializeRequest::id:
 				if (true) {
-					//ObjectUnserializeRequest* msg = (ObjectUnserializeRequest*) request->netmsg;
-					//assert(msg->shard == this->id);
-#if 0
-					Entity* entity = FindOrNull(this->_entities, msg->objectid);
-					if (entity) {
-					}
-					else {
-						TABLE_NAME(msg->tableid);
-						if (!ContainsKey(this->_tables, tablename)) {
-						}
+					ObjectUnserializeRequest* msg = (ObjectUnserializeRequest*) request->netmsg;
+					assert(msg->shard == this->shard);
+
+					Entity* entity = FindOrNull(this->entities, msg->objectid);
+					if (!entity) {
+						entity = this->unserialize(msg->table, msg->objectid);						
 					}
 					
-					ObjectSerializeResponse response;
-					response.shard = request->shard;
-					response.tableid = request->tableid;
-					response.objectid = request->objectid;
-					this->response(request->s, &response, request->opcode);
-#endif					
+					if (!entity) {
+						sendUnserializeResponse(request->s, msg->shard, msg->table, msg->objectid, RECORD_NOT_FOUND_OBJECT, 0, nullptr);
+						break;
+					}
+
+					std::ostringstream o;
+					bool rc = entity->SerializeToString(o, true);
+					if (!rc) {
+						SafeDelete(entity);
+						sendUnserializeResponse(request->s, msg->shard, msg->table, msg->objectid, RECORD_ILLEGAL_OBJECT, 0, nullptr);
+						break;
+					}
+					this->entities.insert(std::make_pair(msg->objectid, entity));
+
+					const std::string& js = o.str();
+					sendUnserializeResponse(request->s, msg->shard, msg->table, msg->objectid, RECORD_OK, js.length(), js.data());
 				}
 				break;
 				
-			default: Error << "unhandle msg: " << request->netmsg->id;
+			default: Error << "unhandle msg: " << request->netmsg->id; break;
 		}
 
+		sRecordService.releaseMessage(request->netmsg);
 		SafeDelete(request);
 	}
 
 	return 0;
 }
 
-#if 0
-bool RecordProcess::createTable(u32 shard, std::string table, const Entity* entity) {
-	ShardDatabase* s = FindOrNull(this->_databases, shard);
-	CHECK_RETURN(s, false, "not found shard: %u", shard);
-
-	std::unordered_map<std::string, record::Value::ValueType>& fields = s->tables[table];
-	fields.clear();
-	
-	const google::protobuf::Map<std::string, record::Value>& values = entity->values();
-	for (auto& i : values) {
-		fields[i.first] = i.second.type;
+bool RecordProcess::SlotDatabase::serialize(const char* table, const Entity* entity) {
+	if (!ContainsKey(this->tables, table)) {
+		bool rc = this->createTable(table, entity);
+		CHECK_RETURN(rc, false, "create table: %s error", table);
+		rc = this->loadField(table);
+		CHECK_RETURN(rc, false, "load field from table: %s error", table);
 	}
 
-	TABLE_NAME(table.c_str());
-
-	std::string sql = "CREATE TABLE `"; // IF NOT EXISTS
-	sql += tablename;
+	const std::unordered_map<std::string, Value>& values = entity->values();
+	
+	std::string sql_values, sql_updates;
+	auto pasteValues = [&sql_values]() {
+	};
+	
+	std::string sql = "INSERT INTO `";
+	sql += table;
 	sql += "` (";
-	sql += "`id` BIGINT UNSIGNED NOT NULL PRIMARY KEY ";
-	for (auto& i : fields) {
-		CHECK_CONTINUE(v2m.find(i.second) != v2m.end(), "illegal ValueType: %d", i.second);
+	for (auto& iterator : values) {
+		sql += "`";
+		sql += iterator.first + "`";
+
+		switch (
+		sql_values += ",";
+		if (iterator.second == Entity::type_string) {
+			sql_values += ", '";
+			sql_values += iterator.value_string;
+			sql_values += "'";
+		}
+		else {
+			sql_values += ",";
+			sql_values += 
+		}
+	}
+	
+	return false;
+}
+
+Entity* RecordProcess::SlotDatabase::unserialize(const char* table, u64 objectid) {
+	std::unordered_map<std::string, Entity::value_type>& desc_fields = this->tables[table];
+
+	char sql[64];
+	snprintf(sql, sizeof(sql), "SELECT * FROM `%s` WHERE id = %ld", table, objectid);
+
+	MySQLResult* result = this->dbhandler->runQuery(sql);
+	if (!result) {
+		return nullptr;
+	}
+
+	u32 rowNumber = result->rowNumber();
+	if (rowNumber == 0) {
+		SafeDelete(result);
+		return nullptr;
+	}
+	
+	u32 fieldNumber = result->fieldNumber();
+	if (fieldNumber != desc_fields.size()) {
+		Alarm.cout("fieldNumber: %u, fields: %ld", fieldNumber, desc_fields.size());
+	}
+	MYSQL_FIELD* fields = result->fetchField();	
+	MYSQL_ROW row = result->fetchRow();
+	assert(row);
+
+	Entity* entity = new Entity(objectid);
+	
+	for (u32 i = 0; i < fieldNumber; ++i) {
+		const MYSQL_FIELD& field = fields[i];
+		CHECK_CONTINUE(desc_fields.find(field.org_name) != desc_fields.end(), "org_name: %s not exist, table: %s", field.org_name, table);
+		CHECK_CONTINUE(ContainsKey(m2v, field.type), "unhandle field.type: %d", field.type);
+		bool is_unsigned = (field.flags & UNSIGNED_FLAG) != 0;
+		try {
+			m2v[field.type](entity->GetValue(field.org_name), row[i], is_unsigned);
+		} catch(std::exception& e) {
+			Error << "field: " << field.org_name << ", type: " << field.type << " convert error: " << e.what();
+		}
+	}
+	SafeDelete(result);
+
+	return entity;
+}
+
+bool RecordProcess::SlotDatabase::createTable(const char* table, const Entity* entity) {
+	const std::unordered_map<std::string, Value>& values = entity->values();
+	std::string sql = "CREATE TABLE `"; // IF NOT EXISTS
+	sql += table;
+	sql += "` (`id` BIGINT UNSIGNED NOT NULL PRIMARY KEY ";
+	for (auto& iterator : values) {
+		CHECK_CONTINUE(v2m.find(iterator.second) != v2m.end(), "illegal ValueType: %d", iterator.second);
 		sql += ", `";
-		sql += i.first + "` ";
-		sql += v2m[i.second] + " NOT NULL ";	//TODO: KEY setting
+		sql += iterator.first + "` ";
+		sql += v2m[iterator.second] + " NOT NULL ";	//TODO: KEY setting		
 	}
 	sql += ") ENGINE=InnoDB DEFAULT CHARSET=utf8 ";
 
 	Trace << "createTable: " << sql;
 
-	return s->handler->runCommand(sql);
+	return this->dbhandler->runCommand(sql);
 }
-#endif
 

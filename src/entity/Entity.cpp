@@ -39,48 +39,46 @@ BEGIN_NAMESPACE_BUNDLE {
 		rapidjson::Document root;  // Default template parameter uses UTF8 and MemoryPoolAllocator.
 		CHECK_RETURN(root.Parse(data, length).HasParseError() == false, false, "Parse `data` error");
 		CHECK_RETURN(root.IsObject(), false, "`data` is not object");
-		this->_values.clear();
 		for (auto i = root.MemberBegin(); i != root.MemberEnd(); ++i) {
 			rapidjson::Value& name = i->name;
 			CHECK_RETURN(name.IsString(), false, "`name` is not string: %d", name.GetType());
-			CHECK_RETURN(!ContainsKey(this->_values, name.GetString()), false, "duplicate `name`: %s", name.GetString());
 			
 			rapidjson::Value& value = i->value;
 			CHECK_RETURN(!value.IsNull(), false, "`name`:%s is null", name.GetString());
 			CHECK_RETURN(!value.IsObject(), false, "`name`:%s is object", name.GetString());
 			CHECK_RETURN(!value.IsArray(), false, "`name`:%s is array", name.GetString());
 
-			bool rc = false;
+			Entity::Value& entityValue = this->_values[name.GetString()];
+			
 			if (value.IsNumber()) {
 				if (value.IsDouble()) {
-					rc = this->_values.insert(std::make_pair(name.GetString(), Value(value.GetFloat()))).second;
+					entityValue = value.GetFloat();
 				}
 				else if (value.IsInt()) {
-					rc = this->_values.insert(std::make_pair(name.GetString(), Value(value.GetInt()))).second;
+					entityValue = value.GetInt();
 				}
 				else if (value.IsUint()) {
-					rc = this->_values.insert(std::make_pair(name.GetString(), Value(value.GetUint()))).second;
+					entityValue = value.GetUint();
 				}
 				else if (value.IsInt64()) {
-					rc = this->_values.insert(std::make_pair(name.GetString(), Value(value.GetInt64()))).second;
+					entityValue = value.GetInt64();
 				}
 				else if (value.IsUint64()) {
-					rc = this->_values.insert(std::make_pair(name.GetString(), Value(value.GetUint64()))).second;
+					entityValue = value.GetUint64();
 				}
 				else {
 					CHECK_RETURN(false, false, "`name`:%s, unknown value number type: %d", name.GetString(), value.GetType());
 				}
 			}
 			else if (value.IsString()) {
-				rc = this->_values.insert(std::make_pair(name.GetString(), Value(value.GetString()))).second;
+				entityValue = value.GetString();
 			}
 			else if (value.IsBool()) {
-				rc = this->_values.insert(std::make_pair(name.GetString(), Value(value.IsTrue()))).second;
+				entityValue = value.IsTrue();
 			}
 			else {
 				CHECK_RETURN(false, false, "`name`:%s, unknown value type: %d", name.GetString(), value.GetType());
 			}
-			assert(rc);			
 		}		
 		return true;
 	}

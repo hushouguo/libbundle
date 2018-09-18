@@ -11,7 +11,7 @@ class RecordProcessManager {
 		bool init();
 		void stop();
 		void update();
-		bool request(u32 shard, u32 tableid, u64 objectid, SOCKET s, Netmessage* netmsg);
+		bool request(u32 shard, u64 objectid, SOCKET s, const Netmessage* netmsg);
 
 	private:
 		std::unordered_map<u32, RecordProcess*> _recordProcesses;

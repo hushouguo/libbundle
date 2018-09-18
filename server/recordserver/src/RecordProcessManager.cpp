@@ -53,10 +53,10 @@ bool RecordProcessManager::init() {
 	return true;
 }
 
-bool RecordProcessManager::request(u32 shard, u32 tableid, u64 objectid, SOCKET s, Netmessage* netmsg) {
+bool RecordProcessManager::request(u32 shard, u64 objectid, SOCKET s, const Netmessage* netmsg) {
 	RecordProcess* recordProcess = FindOrNull(this->_recordProcesses, shard);
 	CHECK_RETURN(recordProcess, false, "not configure shard: %u", shard);
-	return recordProcess->request(shard, tableid, objectid, s, netmsg);
+	return recordProcess->request(shard, objectid, s, netmsg);
 }
 
 void RecordProcessManager::update() {

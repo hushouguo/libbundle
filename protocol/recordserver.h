@@ -7,6 +7,14 @@
 #define __RECORDSERVER_H__
 
 BEGIN_NAMESPACE_BUNDLE {
+	enum RECORD_ERRCODE {
+		RECORD_OK	=	0,
+		RECORD_ILLEGAL_JSON_STRING	=	100,
+		RECORD_NOT_FOUND_OBJECT		=	101,
+		RECORD_ILLEGAL_OBJECT		=	102,
+		RECORD_SERIALIZE_ERROR		=	103,
+	};
+	
 #pragma pack(push, 1)
 	// Serialize: create & update
 	struct ObjectSerializeRequest : public Netmessage {

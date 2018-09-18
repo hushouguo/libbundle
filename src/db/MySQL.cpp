@@ -192,6 +192,8 @@ BEGIN_NAMESPACE_BUNDLE {
 			}
 		}
 
+		//TODO: SET NAMES UTF8
+
 		// CLIENT_INTERACTIVE & set interactive_timeout
 		if (!mysql_real_connect(
 					&this->_mysqlhandle, 

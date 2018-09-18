@@ -8,8 +8,8 @@
 
 struct Recordmessage {
 	SOCKET s = -1;
-	Netmessage* netmsg = nullptr;
-	Recordmessage(SOCKET, Netmessage*);
+	const Netmessage* netmsg = nullptr;
+	Recordmessage(SOCKET, const Netmessage*);
 	~Recordmessage();
 };
 

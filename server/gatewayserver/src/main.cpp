@@ -22,6 +22,13 @@ int main(int argc, char* argv[]) {
 	//CHECK_GOTO(sCentralClient.init(), exit_except, "CentralClient init failure");
 	CHECK_GOTO(sGatewayService.init(), exit_except, "GatewayService init failure");
 	
+	if (true) {
+		sEntityDescriptor.loadDescriptor(1, "./player.xml");
+		Entity* entity = new Entity(1000);
+		entity->dump();
+	}
+
+
 	while (!sConfig.halt) {
 		sTime.now();
 		//sCentralClient.update();
