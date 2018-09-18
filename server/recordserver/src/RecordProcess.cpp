@@ -358,6 +358,8 @@ u32 RecordProcess::SlotDatabase::synchronous() {
 }
 
 bool RecordProcess::SlotDatabase::serialize(const char* table, const Entity* entity) {
+	std::unordered_map<std::string, Entity::value_type>& desc_fields = this->tables[table];
+
 	if (!ContainsKey(this->tables, table)) {
 		bool rc = this->createTable(table, entity);
 		CHECK_RETURN(rc, false, "create table: %s error", table);
@@ -369,6 +371,20 @@ bool RecordProcess::SlotDatabase::serialize(const char* table, const Entity* ent
 
 	std::ostringstream sql_fields, sql_insert, sql_update;
 	for (auto& iterator : values) {
+		if (!ContainsKey(desc_fields, iterator.first)) {
+			bool rc = this->addField(table, iterator.first, iterator.second.type);
+			CHECK_RETURN(rc, false, "add new field: %s, type: %d error", iterator.first.c_str(), iterator.second.type);
+			desc_fields[iterator.first] = iterator.second.type;
+			Trace << "table: " << table << ", add new field: " << iterator.first << ", type: " << Entity::ValueTypeName(iterator.second.type);
+		}
+		
+		if (iterator.second.type != desc_fields[iterator.first].type) {
+			bool rc = this->alterField(table, iterator.first, iterator.second.type);
+			CHECK_RETURN(rc, false, "modify field: %s to new type: %d error", iterator.first.c_str(), iterator.second.type);
+			Trace << "table: " << table << ", modify field: " << iterator.first << ", from type: " << Entity::ValueTypeName(desc_fields[iterator.first]) << " to new type: " << Entity::ValueTypeName(iterator.second.type);
+			desc_fields[iterator.first] = iterator.second.type;
+		}
+	
 		if (sql_fields.tellp() > 0) { sql_fields << ","; }
 		if (sql_insert.tellp() > 0) { sql_insert << ","; }
 		if (sql_update.tellp() > 0) { sql_update << ","; }
@@ -453,6 +469,20 @@ Entity* RecordProcess::SlotDatabase::unserialize(const char* table, u64 objectid
 	SafeDelete(result);
 
 	return entity;
+}
+
+bool RecordProcess::SlotDatabase::addField(const char* table, const std::string& field_name, Entity::value_type type) {
+	std::ostringstream sql;
+	sql << "ALTER TABLE `" << table << "` ADD `" << field_name << "` " << v2m[type];
+	Trace << "alter table: " << sql.str();
+	return this->dbhandler->runCommand(sql.str());
+}
+
+bool RecordProcess::SlotDatabase::alterField(const char* table, const std::string& field_name, Entity::value_type type) {
+	std::ostringstream sql;
+	sql << "ALTER TABLE `" << table << "` MODIFY `" << field_name << "` " << v2m[type] << " NOT NULL ";
+	Trace << "alter table: " << sql.str();
+	return this->dbhandler->runCommand(sql.str());
 }
 
 bool RecordProcess::SlotDatabase::createTable(const char* table, const Entity* entity) {

@@ -39,11 +39,13 @@ class RecordProcess : public Entry<u32, std::string> {
 				}
 			}
 			bool init(std::string conf);
-			bool loadField(std::string table);
 			void stop();
 			void update();
 			u32 synchronous();
+			bool loadField(std::string table);
 			bool createTable(const char* table, const Entity* entity);
+			bool addField(const char* table, const std::string& field_name, Entity::value_type type);
+			bool alterField(const char* table, const std::string& field_name, Entity::value_type type);
 			bool serialize(const char* table, const Entity* entity);
 			Entity* unserialize(const char* table, u64 objectid);
 		};		
