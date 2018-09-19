@@ -14,12 +14,13 @@ BEGIN_NAMESPACE_BUNDLE {
 		public:
 			void serialize(u32, std::string, u64, const std::string&, std::function<void(u32, std::string, u64, u32)>);
 			void unserialize(u32, std::string, u64, std::function<void(u32, std::string, u64, u32, const char*, size_t)>);
-
-			//delete and select
+			void addKey(u32, std::string, u64, std::string, std::function<void(u32, std::string, u64, u32)>);
+			void removeKey(u32, std::string, u64, std::string, std::function<void(u32, std::string, u64, u32)>);
 
 		private:
 			std::list<std::function<void(u32, std::string, u64, u32)>> _serializeCallbacks;
 			std::list<std::function<void(u32, std::string, u64, u32, const char*, size_t)>> _unserializeCallbacks;
+			std::list<std::function<void(u32, std::string, u64, u32)>> _alterCallbacks;
 			bool msgParser(NetworkInterface* task, const Netmessage* netmsg);
 	};
 }

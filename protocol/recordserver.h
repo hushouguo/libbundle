@@ -90,8 +90,8 @@ BEGIN_NAMESPACE_BUNDLE {
 		char table[16];
 		u64  objectid;
 		size_t size() const { return sizeof(*this) + this->length; }
-		u32  length;
-		char where[0];
+		u32  datalen;
+		char data[0];
 	};
 
 	struct ObjectSelectResponse : public Netmessage {
@@ -101,7 +101,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		char table[16];
 		u64  objectid;
 		size_t size() const { return sizeof(*this) + this->length; }
-		u32  length;
+		u32  datalen;
 		char objects[0];	// json encoding, {"id":"entitydata", "id":"entitydata"}
 	};
 
@@ -113,7 +113,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		char table[16];
 		u64  objectid;
 		size_t size() const { return sizeof(*this) + this->length; }
-		u32  length;
+		u32  datalen;
 		char data[0];	// json encoding, {"id":"ADD_KEY", "id":"DROP_KEY", \"id\":\"DROP_FIELD\"}
 	};
 

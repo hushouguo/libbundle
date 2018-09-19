@@ -6,6 +6,8 @@
 #ifndef __RECORD_PROCESS_H__
 #define __RECORD_PROCESS_H__
 
+#define SLOT_HASH_VALUE		sConfig.get("db.slot.value", 8)
+
 class RecordProcess : public Entry<u32, std::string> {
 	public:
 		RecordProcess(u32, const char*);
@@ -46,15 +48,16 @@ class RecordProcess : public Entry<u32, std::string> {
 			bool init(std::string conf);
 			void stop();
 			void update();
+			void dump();
 			u32 synchronous();
 			bool loadField(std::string table);
-			bool createTable(const char* table, const Entity* entity);
-			bool alterTable(const char* table, const char* js, size_t length);
 			bool addField(const char* table, const std::string& field_name, enum_field_types field_type);
 			bool alterField(const char* table, const std::string& field_name, enum_field_types field_type);
 			bool removeField(const char* table, const std::string& field_name);
 			bool addKey(const char* table, const std::string& field_name);
 			bool removeKey(const char* table, const std::string& field_name);
+			bool createTable(const char* table, const Entity* entity);
+			bool alterTable(const char* table, const char* js, size_t length);
 			bool serialize(const char* table, const Entity* entity);
 			Entity* unserialize(const char* table, u64 objectid);
 			bool removeEntity(const char* table, u64 objectid);

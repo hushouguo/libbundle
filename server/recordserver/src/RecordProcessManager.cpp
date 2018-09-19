@@ -35,7 +35,7 @@ bool RecordProcessManager::init() {
 			v.push_back(conf);
 		}
 		
-		CHECK_RETURN(v.size() == 8, false, "fixed 8 mysql connection for per shard");
+		CHECK_RETURN(v.size() == SLOT_HASH_VALUE, false, "fixed %d mysql connection for per shard", SLOT_HASH_VALUE);
 
 		bool rc = this->_recordProcesses.insert(std::make_pair(shard, recordProcess)).second;
 		assert(rc);
@@ -45,7 +45,7 @@ bool RecordProcessManager::init() {
 	for (auto& iterator : this->_recordProcesses) {
 		u32 shard = iterator.first;
 		const std::vector<std::string>& v = confs[shard];
-		assert(v.size() == 8);
+		assert(v.size() == SLOT_HASH_VALUE);
 		bool rc = iterator.second->init(v);
 		CHECK_RETURN(rc, false, "shard: %u conf error", shard);
 	}

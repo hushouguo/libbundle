@@ -42,6 +42,36 @@ BEGIN_NAMESPACE_BUNDLE {
 		this->_unserializeCallbacks.push_back(func);
 	}
 
+	void RecordClient::addKey(u32 shard, std::string table, u64 objectid, std::string field_name, std::function<void(u32, std::string, u64, u32)> func) {
+		std::ostringstream o;
+		o << "{\"" << field_name << "\":\"ADD_KEY\"}";
+		const std::string& js = o.str();
+		NEW_MSG(ObjectAlterRequest, js.length() + sizeof(ObjectAlterRequest));
+		newmsg->shard = shard;
+		strncpy(newmsg->table, table.c_str(), sizeof(newmsg->table));
+		newmsg->objectid = objectid;
+		newmsg->datalen = js.length();
+		memcpy(newmsg->data, js.data(), js.length());
+		newmsg->len = newmsg->size();
+		this->sendMessage(newmsg, newmsg->len);
+		this->_alterCallbacks.push_back(func);
+	}
+	
+	void RecordClient::removeKey(u32 shard, std::string table, u64 objectid, std::string field_name, std::function<void(u32, std::string, u64, u32)> func) {
+		std::ostringstream o;
+		o << "{\"" << field_name << "\":\"DROP_KEY\"}";
+		const std::string& js = o.str();
+		NEW_MSG(ObjectAlterRequest, js.length() + sizeof(ObjectAlterRequest));
+		newmsg->shard = shard;
+		strncpy(newmsg->table, table.c_str(), sizeof(newmsg->table));
+		newmsg->objectid = objectid;
+		newmsg->datalen = js.length();
+		memcpy(newmsg->data, js.data(), js.length());
+		newmsg->len = newmsg->size();
+		this->sendMessage(newmsg, newmsg->len);
+		this->_alterCallbacks.push_back(func);
+	}
+
 	bool RecordClient::msgParser(NetworkInterface* task, const Netmessage* netmsg) {
 		switch (netmsg->id) {
 			case ObjectSerializeResponse::id:
@@ -64,6 +94,18 @@ BEGIN_NAMESPACE_BUNDLE {
 					this->_unserializeCallbacks.pop_front();
 					if (func) {
 						func(response->shard, response->table, response->objectid, response->retval, response->data, response->datalen);
+					}
+				}
+				break;
+
+			case ObjectAlterResponse::id:
+				if (!this->_alterCallbacks.empty()) {
+					ObjectAlterResponse* response = (ObjectAlterResponse *) netmsg;
+					CHECK_RETURN(netmsg->len == response->size(), false, "illegal ObjectAlterResponse");
+					std::function<void(u32, std::string, u64, u32)> func = this->_alterCallbacks.front();
+					this->_alterCallbacks.pop_front();
+					if (func) {
+						func(response->shard, response->table, response->objectid, response->retval);
 					}
 				}
 				break;

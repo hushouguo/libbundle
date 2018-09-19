@@ -205,6 +205,7 @@ bool RecordProcess::SlotDatabase::init(std::string conf) {
 		rc = this->loadField(table);
 		CHECK_RETURN(rc, false, "load field: %s error", table.c_str());
 	}
+	this->dump();
 
 	SafeDelete(this->threadWorker);
 	this->threadWorker = new std::thread([this]() {
@@ -212,6 +213,24 @@ bool RecordProcess::SlotDatabase::init(std::string conf) {
 	});
 	
 	return true;
+}
+
+void RecordProcess::SlotDatabase::dump() {
+	Trace << "shard: " << shard;
+	for (auto& iterator : this->tables) {
+		Trace << "    table: " << iterator.first;
+		const std::unordered_map<std::string, FieldDescriptor>& fields = iterator.second;
+		for (auto& i : fields) {
+			const FieldDescriptor& fieldDescriptor = i.second;
+			Trace << "        FIELD: " << i.first << " => " << m2string[fieldDescriptor.type]
+				<< (IS_PRI_KEY(fieldDescriptor.flags) ? " PRI" : "")
+				<< (IS_NOT_NULL(fieldDescriptor.flags) ? " NOT NULL" : "")
+				<< (IS_UNI_KEY(fieldDescriptor.flags) ? " UNIQUE" : "")
+				<< (IS_MUL_KEY(fieldDescriptor.flags) ? " MUL" : "")
+				<< (IS_UNSIGNED(fieldDescriptor.flags) ? " UNSIGNED" : "")
+				<< ", length: " << fieldDescriptor.length;
+		}
+	}
 }
 
 bool RecordProcess::SlotDatabase::loadField(std::string table) {
@@ -233,40 +252,25 @@ bool RecordProcess::SlotDatabase::loadField(std::string table) {
 		fieldDescriptor.length = field.length;
 	}
 	SafeDelete(result);
-
-	auto dump = [&desc_fields](u32 shard, const std::string& table) {
-		Trace << "shard: " << shard << ", table: " << table;
-		for (auto& i : desc_fields) {
-			const FieldDescriptor& fieldDescriptor = i.second;			
-			Trace << "FIELD: " << i.first << " => " << m2string[fieldDescriptor.type]
-				<< (IS_PRI_KEY(fieldDescriptor.flags) ? " PRI" : "")
-				<< (IS_NOT_NULL(fieldDescriptor.flags) ? " NOT NULL" : "")
-				<< (IS_UNI_KEY(fieldDescriptor.flags) ? " UNIQUE" : "")
-				<< (IS_MUL_KEY(fieldDescriptor.flags) ? " MUL" : "")
-				<< (IS_UNSIGNED(fieldDescriptor.flags) ? " UNSIGNED" : "")
-				<< ", length: " << fieldDescriptor.length;
-		}
-	};
-	dump(this->shard, table);
 	
 	return true;
 }
 
 bool RecordProcess::init(const std::vector<std::string>& v) {
-	assert(v.size() == 8);
+	assert(v.size() == SLOT_HASH_VALUE);
 	for (auto& conf : v) {
 		SlotDatabase* slotDatabase = new SlotDatabase(this->id, this->_slots.size());
 		CHECK_RETURN(slotDatabase->init(conf), false, "init conf: %s error", conf.c_str());
 		this->_slots.push_back(slotDatabase);
 	}
-	assert(this->_slots.size() == 8);
+	assert(this->_slots.size() == SLOT_HASH_VALUE);
 	return true;
 }
 
 
 bool RecordProcess::request(u32 shard, u64 objectid, SOCKET s, const Netmessage* netmsg) {
 	assert(shard == this->id);
-	u32 hashid = objectid % 8;
+	u32 hashid = objectid % SLOT_HASH_VALUE;
 	assert(hashid < this->_slots.size());
 	SlotDatabase* slotDatabase = this->_slots[hashid];
 	
@@ -470,7 +474,7 @@ u32 RecordProcess::SlotDatabase::synchronous() {
 					ObjectAlterRequest* msg = (ObjectAlterRequest*) request->netmsg;
 					assert(msg->shard == this->shard);
 
-					bool retval = this->alterTable(msg->table, msg->data, msg->length);
+					bool retval = this->alterTable(msg->table, msg->data, msg->datalen);
 					sendAlterResponse(request->s, msg->shard, msg->table, msg->objectid, retval ? RECORD_OK : RECORD_DELETE_ERROR);
 				}
 				break;
@@ -514,7 +518,7 @@ bool RecordProcess::SlotDatabase::serialize(const char* table, const Entity* ent
 			bool rc = this->addField(table, iterator.first, field_type);
 			CHECK_RETURN(rc, false, "add new field: %s, type: %d error", iterator.first.c_str(), value.type);
 			this->loadField(table);
-			Trace << "table: " << table << ", add new field: " << iterator.first << ", type: " << Entity::ValueTypeName(value.type);
+			//Trace << "table: " << table << ", add new field: " << iterator.first << ", type: " << Entity::ValueTypeName(value.type);
 		}
 
 		const FieldDescriptor& fieldDescriptor = desc_fields[iterator.first];		
@@ -525,8 +529,8 @@ bool RecordProcess::SlotDatabase::serialize(const char* table, const Entity* ent
 		if (m2m[fieldDescriptor.type][field_type]) {
 			bool rc = this->alterField(table, iterator.first, field_type);
 			CHECK_RETURN(rc, false, "modify field: %s to new type: %s error", iterator.first.c_str(), m2string[field_type]);
-			Trace << "table: " << table << ", modify field: " << iterator.first 
-				<< " from type: " << m2string[fieldDescriptor.type] << " to new type: " << m2string[field_type];
+			//Trace << "table: " << table << ", modify field: " << iterator.first 
+			//	<< " from type: " << m2string[fieldDescriptor.type] << " to new type: " << m2string[field_type];
 			this->loadField(table);
 		}
 	
@@ -564,7 +568,7 @@ bool RecordProcess::SlotDatabase::serialize(const char* table, const Entity* ent
 	std::ostringstream sql;
 	sql << "INSERT INTO `" << table << "` (" << sql_fields.str() << ") VALUES (" << sql_insert.str();
 	sql << ") ON DUPLICATE KEY UPDATE " << sql_update.str();
-	Trace << "serialize sql: " << sql.str();
+	//Trace << "serialize sql: " << sql.str();
 	return this->dbhandler->runCommand(sql.str());
 }
 
@@ -614,7 +618,7 @@ Entity* RecordProcess::SlotDatabase::unserialize(const char* table, u64 objectid
 bool RecordProcess::SlotDatabase::removeEntity(const char* table, u64 objectid) {
 	std::ostringstream sql;
 	sql << "DELETE FROM TABLE `" << table << "` WHERE id = " << objectid;
-	Trace << "delete table: " << sql.str();
+	//Trace << "delete table: " << sql.str();
 	return this->dbhandler->runCommand(sql.str());
 }
 
@@ -622,7 +626,7 @@ bool RecordProcess::SlotDatabase::addField(const char* table, const std::string&
 	CHECK_RETURN(m2string.find(field_type) != m2string.end(), false, "illegal field type: %d", field_type);		
 	std::ostringstream sql;
 	sql << "ALTER TABLE `" << table << "` ADD `" << field_name << "` " << m2string[field_type] << " NOT NULL";
-	Trace << "alter table: " << sql.str();
+	//Trace << "alter table: " << sql.str();
 	return this->dbhandler->runCommand(sql.str());
 }
 
@@ -630,28 +634,28 @@ bool RecordProcess::SlotDatabase::alterField(const char* table, const std::strin
 	CHECK_RETURN(m2string.find(field_type) != m2string.end(), false, "illegal field type: %d", field_type);		
 	std::ostringstream sql;
 	sql << "ALTER TABLE `" << table << "` MODIFY `" << field_name << "` " << m2string[field_type] << " NOT NULL";
-	Trace << "alter table: " << sql.str();
+	//Trace << "alter table: " << sql.str();
 	return this->dbhandler->runCommand(sql.str());
 }
 
 bool RecordProcess::SlotDatabase::removeField(const char* table, const std::string& field_name) {
 	std::ostringstream sql;
 	sql << "ALTER TABLE `" << table << "` DROP `" << field_name << "` ";
-	Trace << "alter table: " << sql.str();
+	//Trace << "alter table: " << sql.str();
 	return this->dbhandler->runCommand(sql.str());
 }
 
 bool RecordProcess::SlotDatabase::addKey(const char* table, const std::string& field_name) {
 	std::ostringstream sql;
 	sql << "ALTER TABLE `" << table << "` ADD KEY `" << field_name << "`(`" << field_name << "`)";
-	Trace << "alter table: " << sql.str();
+	//Trace << "alter table: " << sql.str();
 	return this->dbhandler->runCommand(sql.str());
 }
 
 bool RecordProcess::SlotDatabase::removeKey(const char* table, const std::string& field_name) {
 	std::ostringstream sql;
 	sql << "ALTER TABLE `" << table << "` DROP KEY `" << field_name << "` ";
-	Trace << "alter table: " << sql.str();
+	//Trace << "alter table: " << sql.str();
 	return this->dbhandler->runCommand(sql.str());
 }
 
@@ -668,7 +672,7 @@ bool RecordProcess::SlotDatabase::createTable(const char* table, const Entity* e
 		sql << ", `" << iterator.first << "` " << m2string[field_type] << " NOT NULL";	//TODO: KEY setting
 	}
 	sql << ") ENGINE=InnoDB DEFAULT CHARSET=utf8";
-	Trace << "createTable: " << sql.str();
+	//Trace << "createTable: " << sql.str();
 	return this->dbhandler->runCommand(sql.str());
 }
 
