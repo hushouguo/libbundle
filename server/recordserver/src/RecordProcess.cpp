@@ -304,7 +304,6 @@ void RecordProcess::SlotDatabase::stop() {
 		SafeDelete(this->threadWorker);
 		for (auto& i : this->entities) {
 			Entity* entity = i.second;
-			//TODO: write to db ??
 			SafeDelete(entity);
 		}
 		this->entities.clear();
@@ -326,6 +325,7 @@ void RecordProcess::SlotDatabase::update() {
 			std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds));
 		}
 	}
+	this->synchronous();
 	System.cout("recordProcess: %d thread exit", this->id);
 }
 
@@ -356,6 +356,32 @@ u32 RecordProcess::SlotDatabase::synchronous() {
 			assert(datalen > 0);
 			memcpy(newmsg->data, data, datalen);
 		}
+		newmsg->len = newmsg->size();
+		
+		std::lock_guard<std::mutex> guard(this->rlocker);
+		this->rlist.push_back(response);
+	};
+	
+	auto sendDeleteResponse = [this](SOCKET s, u32 shard, const char* table, u64 objectid, u32 retval) {
+		ObjectDeleteResponse* newmsg = Constructor((ObjectDeleteResponse *)(::malloc(sizeof(ObjectDeleteResponse))));
+		Recordmessage* response = new Recordmessage(s, newmsg);
+		newmsg->shard = shard;
+		strncpy(newmsg->table, table, sizeof(newmsg->table));
+		newmsg->objectid = objectid;
+		newmsg->retval = retval;
+		newmsg->len = newmsg->size();
+		
+		std::lock_guard<std::mutex> guard(this->rlocker);
+		this->rlist.push_back(response);
+	};
+	
+	auto sendAlterResponse = [this](SOCKET s, u32 shard, const char* table, u64 objectid, u32 retval) {
+		ObjectAlterResponse* newmsg = Constructor((ObjectAlterResponse *)(::malloc(sizeof(ObjectAlterResponse))));
+		Recordmessage* response = new Recordmessage(s, newmsg);
+		newmsg->shard = shard;
+		strncpy(newmsg->table, table, sizeof(newmsg->table));
+		newmsg->objectid = objectid;
+		newmsg->retval = retval;
 		newmsg->len = newmsg->size();
 		
 		std::lock_guard<std::mutex> guard(this->rlocker);
@@ -402,7 +428,7 @@ u32 RecordProcess::SlotDatabase::synchronous() {
 
 					Entity* entity = FindOrNull(this->entities, msg->objectid);
 					if (!entity) {
-						entity = this->unserialize(msg->table, msg->objectid);						
+						entity = this->unserialize(msg->table, msg->objectid);
 					}
 					
 					if (!entity) {
@@ -421,6 +447,38 @@ u32 RecordProcess::SlotDatabase::synchronous() {
 
 					const std::string& js = o.str();
 					sendUnserializeResponse(request->s, msg->shard, msg->table, msg->objectid, RECORD_OK, js.length(), js.data());
+				}
+				break;
+
+			case ObjectDeleteRequest::id:
+				if (true) {
+					ObjectDeleteRequest* msg = (ObjectDeleteRequest*) request->netmsg;
+					assert(msg->shard == this->shard);
+
+					auto iterator = this->entities.find(msg->objectid);
+					if (iterator != this->entities.end()) {
+						this->entities.erase(iterator);
+					}
+
+					bool retval = this->removeEntity(msg->table, msg->objectid);
+					sendDeleteResponse(request->s, msg->shard, msg->table, msg->objectid, retval ? RECORD_OK : RECORD_DELETE_ERROR);
+				}
+				break;
+
+			case ObjectAlterRequest::id:
+				if (true) {
+					ObjectAlterRequest* msg = (ObjectAlterRequest*) request->netmsg;
+					assert(msg->shard == this->shard);
+
+					bool retval = this->alterTable(msg->table, msg->data, msg->length);
+					sendAlterResponse(request->s, msg->shard, msg->table, msg->objectid, retval ? RECORD_OK : RECORD_DELETE_ERROR);
+				}
+				break;
+
+			case ObjectSelectRequest::id:
+				if (true) {
+					//ObjectSelectRequest* msg = (ObjectSelectRequest*) request->netmsg;
+					//assert(msg->shard == this->shard);
 				}
 				break;
 				
@@ -506,7 +564,7 @@ bool RecordProcess::SlotDatabase::serialize(const char* table, const Entity* ent
 	std::ostringstream sql;
 	sql << "INSERT INTO `" << table << "` (" << sql_fields.str() << ") VALUES (" << sql_insert.str();
 	sql << ") ON DUPLICATE KEY UPDATE " << sql_update.str();
-	Trace << "serialize sql: " << sql;
+	Trace << "serialize sql: " << sql.str();
 	return this->dbhandler->runCommand(sql.str());
 }
 
@@ -553,6 +611,13 @@ Entity* RecordProcess::SlotDatabase::unserialize(const char* table, u64 objectid
 	return entity;
 }
 
+bool RecordProcess::SlotDatabase::removeEntity(const char* table, u64 objectid) {
+	std::ostringstream sql;
+	sql << "DELETE FROM TABLE `" << table << "` WHERE id = " << objectid;
+	Trace << "delete table: " << sql.str();
+	return this->dbhandler->runCommand(sql.str());
+}
+
 bool RecordProcess::SlotDatabase::addField(const char* table, const std::string& field_name, enum_field_types field_type) {
 	CHECK_RETURN(m2string.find(field_type) != m2string.end(), false, "illegal field type: %d", field_type);		
 	std::ostringstream sql;
@@ -565,6 +630,27 @@ bool RecordProcess::SlotDatabase::alterField(const char* table, const std::strin
 	CHECK_RETURN(m2string.find(field_type) != m2string.end(), false, "illegal field type: %d", field_type);		
 	std::ostringstream sql;
 	sql << "ALTER TABLE `" << table << "` MODIFY `" << field_name << "` " << m2string[field_type] << " NOT NULL";
+	Trace << "alter table: " << sql.str();
+	return this->dbhandler->runCommand(sql.str());
+}
+
+bool RecordProcess::SlotDatabase::removeField(const char* table, const std::string& field_name) {
+	std::ostringstream sql;
+	sql << "ALTER TABLE `" << table << "` DROP `" << field_name << "` ";
+	Trace << "alter table: " << sql.str();
+	return this->dbhandler->runCommand(sql.str());
+}
+
+bool RecordProcess::SlotDatabase::addKey(const char* table, const std::string& field_name) {
+	std::ostringstream sql;
+	sql << "ALTER TABLE `" << table << "` ADD KEY `" << field_name << "`(`" << field_name << "`)";
+	Trace << "alter table: " << sql.str();
+	return this->dbhandler->runCommand(sql.str());
+}
+
+bool RecordProcess::SlotDatabase::removeKey(const char* table, const std::string& field_name) {
+	std::ostringstream sql;
+	sql << "ALTER TABLE `" << table << "` DROP KEY `" << field_name << "` ";
 	Trace << "alter table: " << sql.str();
 	return this->dbhandler->runCommand(sql.str());
 }
@@ -584,5 +670,41 @@ bool RecordProcess::SlotDatabase::createTable(const char* table, const Entity* e
 	sql << ") ENGINE=InnoDB DEFAULT CHARSET=utf8";
 	Trace << "createTable: " << sql.str();
 	return this->dbhandler->runCommand(sql.str());
+}
+
+static std::map<std::string, std::function<bool(RecordProcess::SlotDatabase*, const char*, const std::string&)>> options = {
+	{ "ADD_KEY",	[](RecordProcess::SlotDatabase* slot, const char* table, const std::string& orgname) -> bool {
+		slot->addKey(table, orgname);
+	}},
+	{ "DROP_KEY",	[](RecordProcess::SlotDatabase* slot, const char* table, const std::string& orgname) -> bool {
+		slot->removeKey(table, orgname);
+	}},
+	{ "DROP_FIELD", [](RecordProcess::SlotDatabase* slot, const char* table, const std::string& orgname) -> bool {
+		slot->removeField(table, orgname);
+	}},
+};
+
+bool RecordProcess::SlotDatabase::alterTable(const char* table, const char* js, size_t length) {
+	rapidjson::Document root;  // Default template parameter uses UTF8 and MemoryPoolAllocator.
+	CHECK_RETURN(root.Parse(js, length).HasParseError() == false, false, "Parse `data` error");
+	CHECK_RETURN(root.IsObject(), false, "`data` is not object");
+	
+	std::unordered_map<std::string, FieldDescriptor>& desc_fields = this->tables[table];
+	
+	for (auto i = root.MemberBegin(); i != root.MemberEnd(); ++i) {
+		rapidjson::Value& name = i->name;
+		CHECK_RETURN(name.IsString(), false, "`name` is not string: %d", name.GetType());
+		
+		rapidjson::Value& value = i->value;
+		CHECK_RETURN(value.IsString(), false, "`value` is not string: %d", value.GetType());
+
+		CHECK_RETURN(ContainsKey(desc_fields, name.GetString()), false, "not exist field: %s", name.GetString());
+		CHECK_RETURN(ContainsKey(options, value.GetString()), false, "not support options: %s", value.GetString());
+
+		std::string orgname = value.GetString();
+		options[value.GetString()](this, table, orgname);
+	}
+	
+	return true;	
 }
 

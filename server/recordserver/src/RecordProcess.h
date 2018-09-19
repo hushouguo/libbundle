@@ -49,10 +49,15 @@ class RecordProcess : public Entry<u32, std::string> {
 			u32 synchronous();
 			bool loadField(std::string table);
 			bool createTable(const char* table, const Entity* entity);
+			bool alterTable(const char* table, const char* js, size_t length);
 			bool addField(const char* table, const std::string& field_name, enum_field_types field_type);
 			bool alterField(const char* table, const std::string& field_name, enum_field_types field_type);
+			bool removeField(const char* table, const std::string& field_name);
+			bool addKey(const char* table, const std::string& field_name);
+			bool removeKey(const char* table, const std::string& field_name);
 			bool serialize(const char* table, const Entity* entity);
 			Entity* unserialize(const char* table, u64 objectid);
+			bool removeEntity(const char* table, u64 objectid);
 		};		
 		std::vector<SlotDatabase*> _slots;		
 		void update(SlotDatabase* slotDatabase);

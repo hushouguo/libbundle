@@ -61,10 +61,9 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	bool MySQL::createDatabase(std::string database) {
-		std::string s = "CREATE DATABASE IF NOT EXISTS `";
-		s += database;
-		s += "` DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci";
-		return this->runCommand(s);
+		std::ostringstream sql;
+		sql << "CREATE DATABASE IF NOT EXISTS `" << database << "` DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci";
+		return this->runCommand(sql.str());
 	}
 
 	bool MySQL::loadDatabase(std::string where, std::set<std::string>& results) {

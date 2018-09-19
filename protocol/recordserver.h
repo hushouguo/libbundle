@@ -13,6 +13,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		RECORD_NOT_FOUND_OBJECT		=	101,
 		RECORD_ILLEGAL_OBJECT		=	102,
 		RECORD_SERIALIZE_ERROR		=	103,
+		RECORD_DELETE_ERROR			=	104,
 	};
 	
 #pragma pack(push, 1)
@@ -102,6 +103,28 @@ BEGIN_NAMESPACE_BUNDLE {
 		size_t size() const { return sizeof(*this) + this->length; }
 		u32  length;
 		char objects[0];	// json encoding, {"id":"entitydata", "id":"entitydata"}
+	};
+
+	// Alter
+	struct ObjectAlterRequest : public Netmessage {
+		enum { id = 0x109 };
+		ObjectAlterRequest() : Netmessage(id) {}
+		u32  shard;
+		char table[16];
+		u64  objectid;
+		size_t size() const { return sizeof(*this) + this->length; }
+		u32  length;
+		char data[0];	// json encoding, {"id":"ADD_KEY", "id":"DROP_KEY", \"id\":\"DROP_FIELD\"}
+	};
+
+	struct ObjectAlterResponse : public Netmessage {
+		enum { id = 0x10a };
+		ObjectAlterResponse() : Netmessage(id) {}
+		u32  shard;
+		char table[16];
+		u64  objectid;
+		size_t size() const { return sizeof(*this) + this->length; }
+		u32 retval;		// 0: OK, !0: errno
 	};
 #pragma pack(pop)	
 }
