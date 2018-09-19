@@ -20,40 +20,105 @@
 
 #define DEF_VARCHAR_LENGTH	128
 
+// rule 1: the same type of fields cannot be converted. such as: TINY to TINY is forbidden
+// rule 2: different types of fields can be converted. such as: TINY to FLOAT is allow
+// rule 3: the same family type of fields can not be converted from big to small. such as: LONG to TINY is forbidden, but LONG to LONGLONG is allow.
+static std::map<enum_field_types, std::map<enum_field_types, bool>> m2m = {
+	{ MYSQL_TYPE_TINY, {
+		{ MYSQL_TYPE_TINY, false },
+		{ MYSQL_TYPE_LONG, true },
+		{ MYSQL_TYPE_LONGLONG, true },
+		{ MYSQL_TYPE_FLOAT, true },
+		{ MYSQL_TYPE_VAR_STRING, true },
+		{ MYSQL_TYPE_BLOB, true },
+		{ MYSQL_TYPE_LONG_BLOB, true },
+	}},
+	{ MYSQL_TYPE_LONG, {
+		{ MYSQL_TYPE_TINY, false },
+		{ MYSQL_TYPE_LONG, false },
+		{ MYSQL_TYPE_LONGLONG, true },
+		{ MYSQL_TYPE_FLOAT, true },
+		{ MYSQL_TYPE_VAR_STRING, true },
+		{ MYSQL_TYPE_BLOB, true },
+		{ MYSQL_TYPE_LONG_BLOB, true },
+	}},
+	{ MYSQL_TYPE_LONGLONG, {
+		{ MYSQL_TYPE_TINY, false },
+		{ MYSQL_TYPE_LONG, false },
+		{ MYSQL_TYPE_LONGLONG, false },
+		{ MYSQL_TYPE_FLOAT, true },
+		{ MYSQL_TYPE_VAR_STRING, true },
+		{ MYSQL_TYPE_BLOB, true },
+		{ MYSQL_TYPE_LONG_BLOB, true },
+	}},
+	{ MYSQL_TYPE_FLOAT, {
+		{ MYSQL_TYPE_TINY, true },
+		{ MYSQL_TYPE_LONG, true },
+		{ MYSQL_TYPE_LONGLONG, true },
+		{ MYSQL_TYPE_FLOAT, false },
+		{ MYSQL_TYPE_VAR_STRING, true },
+		{ MYSQL_TYPE_BLOB, true },
+		{ MYSQL_TYPE_LONG_BLOB, true },
+	}},
+	{ MYSQL_TYPE_VAR_STRING, {
+		{ MYSQL_TYPE_TINY, true },
+		{ MYSQL_TYPE_LONG, true },
+		{ MYSQL_TYPE_LONGLONG, true },
+		{ MYSQL_TYPE_FLOAT, true },
+		{ MYSQL_TYPE_VAR_STRING, false },
+		{ MYSQL_TYPE_BLOB, true },
+		{ MYSQL_TYPE_LONG_BLOB, true },
+	}},
+	{ MYSQL_TYPE_BLOB, {
+		{ MYSQL_TYPE_TINY, true },
+		{ MYSQL_TYPE_LONG, true },
+		{ MYSQL_TYPE_LONGLONG, true },
+		{ MYSQL_TYPE_FLOAT, true },
+		{ MYSQL_TYPE_VAR_STRING, false },
+		{ MYSQL_TYPE_BLOB, false },
+		{ MYSQL_TYPE_LONG_BLOB, true },
+	}},
+	{ MYSQL_TYPE_LONG_BLOB, {
+		{ MYSQL_TYPE_TINY, true },
+		{ MYSQL_TYPE_LONG, true },
+		{ MYSQL_TYPE_LONGLONG, true },
+		{ MYSQL_TYPE_FLOAT, true },
+		{ MYSQL_TYPE_VAR_STRING, false },
+		{ MYSQL_TYPE_BLOB, false },
+		{ MYSQL_TYPE_LONG_BLOB, false },
+	}},
+};
+
 static std::map<enum_field_types, const char*> m2string = {
 	{ MYSQL_TYPE_TINY, "TINYINT" },
-	{ MYSQL_TYPE_SHORT, "SMALLINT" },
 	{ MYSQL_TYPE_LONG, "INT" },
 	{ MYSQL_TYPE_LONGLONG, "BIGINT" },
 	{ MYSQL_TYPE_FLOAT, "FLOAT" },
-	{ MYSQL_TYPE_DOUBLE, "DOUBLE" },		
 	{ MYSQL_TYPE_VAR_STRING, "VARCHAR(128)" },
-	{ MYSQL_TYPE_STRING, "VARCHAR(128)" },
-	{ MYSQL_TYPE_VARCHAR, "VARCHAR(128)" },
-	{ MYSQL_TYPE_TINY_BLOB, "TINYTEXT" },
 	{ MYSQL_TYPE_BLOB, "TEXT" },
-	{ MYSQL_TYPE_MEDIUM_BLOB, "MEDIUMTEXT" },
 	{ MYSQL_TYPE_LONG_BLOB, "LONGTEXT" },
-	{ MYSQL_TYPE_DATETIME, "VARCHAR(128)" },
 };
 
+//
 static std::map<enum_field_types, Entity::value_type> m2v = {
 	{ MYSQL_TYPE_TINY, Entity::type_bool },
-	{ MYSQL_TYPE_SHORT, Entity::type_integer },
 	{ MYSQL_TYPE_LONG, Entity::type_integer },
 	{ MYSQL_TYPE_LONGLONG, Entity::type_integer },
 	{ MYSQL_TYPE_FLOAT, Entity::type_float },
-	{ MYSQL_TYPE_DOUBLE, Entity::type_float },		
 	{ MYSQL_TYPE_VAR_STRING, Entity::type_string },
-	{ MYSQL_TYPE_STRING, Entity::type_string },
-	{ MYSQL_TYPE_VARCHAR, Entity::type_string },
-	{ MYSQL_TYPE_TINY_BLOB, Entity::type_string },
 	{ MYSQL_TYPE_BLOB, Entity::type_string },
-	{ MYSQL_TYPE_MEDIUM_BLOB, Entity::type_string },
 	{ MYSQL_TYPE_LONG_BLOB, Entity::type_string },
-	{ MYSQL_TYPE_DATETIME, Entity::type_string },		
 };
 
+//
+// TINY			-> tinyint		->	bool
+// LONG			-> int			->	integer
+// LONGLONG		-> bigint		->	integer
+// FLOAT		-> float		->	float
+// VAR_STRING	-> varchar(128)	->	string
+// BLOB			-> text			->	string
+// LONGBLOB		-> longtext		->	string
+//
 static std::map<Entity::value_type, std::function<enum_field_types(const Entity::Value&)>> v2m = {
 	{ Entity::type_integer, [](const Entity::Value& value) -> enum_field_types {
 		assert(value.type == Entity::type_integer);
@@ -82,9 +147,6 @@ static std::map<enum_field_types, std::function<void(Entity::Value&, std::string
 	{ MYSQL_TYPE_TINY, [](Entity::Value& value, std::string s, bool is_unsigned) {	// bool
 		value = std::stoi(s) != 0;
 	}},
-	{ MYSQL_TYPE_SHORT, [](Entity::Value& value, std::string s, bool is_unsigned) { // integer
-		value = std::stoi(s);
-	}},
 	{ MYSQL_TYPE_LONG, [](Entity::Value& value, std::string s, bool is_unsigned) { 	// integer
 		value = is_unsigned ? std::stoul(s) : std::stol(s);
 	}},
@@ -94,31 +156,13 @@ static std::map<enum_field_types, std::function<void(Entity::Value&, std::string
 	{ MYSQL_TYPE_FLOAT, [](Entity::Value& value, std::string s, bool is_unsigned) { // float
 		value = std::stof(s);
 	}},
-	{ MYSQL_TYPE_DOUBLE, [](Entity::Value& value, std::string s, bool is_unsigned) { // float
-		value = std::stod(s);
-	}},		
 	{ MYSQL_TYPE_VAR_STRING, [](Entity::Value& value, std::string s, bool is_unsigned) { // string
-		value = s;
-	}},
-	{ MYSQL_TYPE_STRING, [](Entity::Value& value, std::string s, bool is_unsigned) { // string
-		value = s;
-	}},
-	{ MYSQL_TYPE_VARCHAR, [](Entity::Value& value, std::string s, bool is_unsigned) { // string
-		value = s;
-	}},
-	{ MYSQL_TYPE_TINY_BLOB, [](Entity::Value& value, std::string s, bool is_unsigned) { // string
 		value = s;
 	}},
 	{ MYSQL_TYPE_BLOB, [](Entity::Value& value, std::string s, bool is_unsigned) { // string
 		value = s;
 	}},
-	{ MYSQL_TYPE_MEDIUM_BLOB, [](Entity::Value& value, std::string s, bool is_unsigned) { // string
-		value = s;
-	}},
 	{ MYSQL_TYPE_LONG_BLOB, [](Entity::Value& value, std::string s, bool is_unsigned) { // string
-		value = s;
-	}},
-	{ MYSQL_TYPE_DATETIME, [](Entity::Value& value, std::string s, bool is_unsigned) { // string
 		value = s;
 	}},
 };
@@ -182,7 +226,7 @@ bool RecordProcess::SlotDatabase::loadField(std::string table) {
 	MYSQL_FIELD* fields = result->fetchField();
 	for (u32 i = 0; i < fieldNumber; ++i) {
 		const MYSQL_FIELD& field = fields[i];
-		//CHECK_CONTINUE(desc_fields.find(field.org_name) == desc_fields.end(), "duplicate org_name: %s, table: %s", field.org_name, table.c_str());
+		CHECK_RETURN(ContainsKey(m2string, field.type), false, "table: %s found not support field: %s, type: %d", table.c_str(), field.org_name, field.type);
 		FieldDescriptor& fieldDescriptor = desc_fields[field.org_name];
 		fieldDescriptor.type = field.type;
 		fieldDescriptor.flags = field.flags;
@@ -404,7 +448,7 @@ bool RecordProcess::SlotDatabase::serialize(const char* table, const Entity* ent
 	std::ostringstream sql_fields, sql_insert, sql_update;
 	for (auto& iterator : values) {
 		const Entity::Value& value = iterator.second;
-		CHECK_CONTINUE(v2m.find(value.type) != v2m.end(), "illegal ValueType: %d", value.type); 		
+		CHECK_RETURN(v2m.find(value.type) != v2m.end(), false, "illegal ValueType: %d", value.type); 		
 		enum_field_types field_type = v2m[value.type](value);
 
 		// add field
@@ -415,15 +459,16 @@ bool RecordProcess::SlotDatabase::serialize(const char* table, const Entity* ent
 			Trace << "table: " << table << ", add new field: " << iterator.first << ", type: " << Entity::ValueTypeName(value.type);
 		}
 
-		const FieldDescriptor& fileDescriptor = desc_fields[iterator.first];
-
-		// modify field, BIGINT don't to INT
-		if (field_type != fileDescriptor.type) {
-			Trace << "field_type: " << field_type << ", type: " << fileDescriptor.type;
+		const FieldDescriptor& fieldDescriptor = desc_fields[iterator.first];		
+		CHECK_RETURN(ContainsKey(m2m, fieldDescriptor.type), false, "illegal fileDescriptor.type: %d", fieldDescriptor.type);
+		CHECK_RETURN(ContainsKey(m2m[fieldDescriptor.type], field_type), false, "illegal field_type: %d", field_type);
+		
+		// modify field
+		if (m2m[fieldDescriptor.type][field_type]) {
 			bool rc = this->alterField(table, iterator.first, field_type);
-			CHECK_RETURN(rc, false, "modify field: %s to new type: %d error", iterator.first.c_str(), value.type);
+			CHECK_RETURN(rc, false, "modify field: %s to new type: %s error", iterator.first.c_str(), m2string[field_type]);
 			Trace << "table: " << table << ", modify field: " << iterator.first 
-				<< " from type: " << m2string[fileDescriptor.type] << " to new type: " << m2string[field_type];
+				<< " from type: " << m2string[fieldDescriptor.type] << " to new type: " << m2string[field_type];
 			this->loadField(table);
 		}
 	
