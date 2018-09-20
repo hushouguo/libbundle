@@ -26,7 +26,7 @@
 //
 
 //
-// performance:
+// benchmark:
 //	1 million EasyMessage object constrctor and ostringstream waste: 546 ms
 //	1 million log_message but don't write to file and stdout waste: 1173 ms
 //	1 million log_message and write to file stream and not flush, not stdout, waste: 1231 ms
@@ -290,8 +290,10 @@ BEGIN_NAMESPACE_BUNDLE {
 				struct LogNode* next;
 				LogNode() : levelNode(nullptr), log(nullptr), next(nullptr) {}
 				LogNode(LevelNode* _levelNode, std::stringbuf* _log) : levelNode(_levelNode), log(_log), next(nullptr) {}
-			} _logNode, *_logNodeHead = &_logNode;
-			std::atomic<LogNode*> _logNodeTail = { &_logNode };
+			};
+			LockfreeQueue<LogNode> _logQueue;
+			std::mutex _logMutex;
+			std::condition_variable _logCondition;
 			std::thread* _logthread = nullptr;
 			void logProcess();
 #endif			
@@ -363,11 +365,8 @@ BEGIN_NAMESPACE_BUNDLE {
 			LevelNode* levelNode = &this->_levels[easyMessage->level()];
 			
 #ifdef ENABLE_ASYNC_SEND
-			LogNode* logNode = new LogNode(levelNode, easyMessage->buffer());
-			LogNode* tailNode = this->_logNodeTail.exchange(logNode);
-			assert(tailNode != nullptr);
-			assert(tailNode->next == nullptr);
-			tailNode->next = logNode;
+			this->_logQueue.push_back(new LogNode(levelNode, easyMessage->buffer()));
+			this->_logCondition.notify_all();
 #else
 			const std::string& s = easyMessage->buffer()->str();
 			this->send_to_stdout(levelNode, s);
@@ -381,28 +380,24 @@ BEGIN_NAMESPACE_BUNDLE {
 #ifdef ENABLE_ASYNC_SEND
 	void EasylogInternal::logProcess() {
 		while (true) {
-			LogNode* logNode = this->_logNodeHead;
-			assert(logNode != nullptr);
-			if (logNode->log != nullptr) {
+			LogNode* logNode = this->_logQueue.pop_front();
+			if (logNode) {
+				assert(logNode->log);
 				const std::string& s = logNode->log->str();
 				this->send_to_stdout(logNode->levelNode, s);
 				this->send_to_file(logNode->levelNode, s);
 				this->send_to_network(logNode->levelNode, s);
 				SafeDelete(logNode->log);
-			}
-
-			if (logNode->next != nullptr) {
-				this->_logNodeHead = logNode->next;
-				if (logNode->levelNode != nullptr) {
-					SafeDelete(logNode); // _logNode is not initiate node
-				}
+				SafeDelete(logNode);
 			}
 			else {
 				if (this->isstop()) { break; }
-				std::this_thread::sleep_for(std::chrono::milliseconds(1));
+				//std::this_thread::sleep_for(std::chrono::milliseconds(1));
+				std::unique_lock<std::mutex> locker(this->_logMutex);
+				this->_logCondition.wait(locker);
 			}
 		}
-		fprintf(stderr, "logProcess thread exit, %s\n", this->_logNodeHead == this->_logNodeTail.load() ? "all mission done" : "mission not completed");
+		fprintf(stderr, "logProcess thread exit, logQueue: %ld\n", this->_logQueue.size());
 	}
 #endif
 
@@ -590,6 +585,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	void EasylogInternal::stop() {
 		this->_stop = true;
 #ifdef ENABLE_ASYNC_SEND		
+		this->_logCondition.notify_all();
 		if (this->_logthread && this->_logthread->joinable()) {
 			this->_logthread->join();
 		}

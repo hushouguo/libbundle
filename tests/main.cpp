@@ -13,8 +13,43 @@
 #include "entity/test_entity.h"
 #include "lockfree/test_lockfree.h"
 
+std::mutex mtx;
+std::condition_variable cv;
+
+bool isstop = false;
 int main() {
 	bundle::Easylog::syslog()->set_tostdout(bundle::GLOBAL, true);
+	auto thread1 = [](int id) {
+		fprintf(stderr, "thread:%d start\n", id);
+		while (!isstop) {
+			std::unique_lock<std::mutex> lk(mtx);
+			cv.wait(lk);
+			fprintf(stderr, "thread:%d wakeup\n", id);
+		}
+		fprintf(stderr, "thread:%d exit\n", id);
+	};
+
+
+	std::vector<std::thread*> v;
+	for (int n = 0; n < 8; ++n) {
+		v.push_back(new std::thread(thread1, n));
+	}
+
+	sleep(1);
+
+	for (int n = 0; n < 10; ++n) {
+		fprintf(stderr, "notify:%d\n", n);
+		cv.notify_one();
+		sleep(1);
+	}
+
+	isstop = true;
+	cv.notify_all();
+
+	for (auto& i : v) {
+		i->join();
+	}
+
 	//test_tools();
 	//test_net();
 	//test_csv("./csv/test.csv");
@@ -24,7 +59,7 @@ int main() {
 	//test_easylog();
 	//test_recordclient("127.0.0.1", 9990);
 	//test_entity();
-	test_lockfree();
+	//test_lockfree();
 	bundle::Easylog::syslog()->stop();
 	return 0;
 }
