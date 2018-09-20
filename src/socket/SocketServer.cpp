@@ -23,8 +23,10 @@ BEGIN_NAMESPACE_BUNDLE {
 			void stop() override;
 			inline bool isstop() { return this->_stop; }
 			Rawmessage* receiveMessage(SOCKET& s, bool& establish, bool& close) override;
+			Rawmessage* initMessage(size_t) override;
 			void sendMessage(SOCKET s, const void*, size_t) override;
-			//void sendMessage(SOCKET s, const Rawmessage*) override;
+			void* getMessageData(Rawmessage*) override;
+			void sendMessage(SOCKET s, const Rawmessage*) override;
 			void releaseMessage(Rawmessage*) override;
 			void close(SOCKET s) override;
 			size_t size() override;
@@ -326,14 +328,20 @@ BEGIN_NAMESPACE_BUNDLE {
 		this->pushMessage(msg);
 	}
 
-#if 0
+	Rawmessage* SocketServerInternal::initMessage(size_t payload_len) {
+		Socketmessage* msg = allocateMessage(BUNDLE_INVALID_SOCKET, SM_OPCODE_MESSAGE, payload_len);
+		return msg->rawmsg;
+	}
+
+	void* SocketServerInternal::getMessageData(Rawmessage* rawmsg) {
+		return rawmsg->payload;
+	}
+	
 	void SocketServerInternal::sendMessage(SOCKET s, const Rawmessage* rawmsg) {
-		assert(rawmsg);
-		assert(rawmsg->payload_len > 0);
-		Socketmessage* msg = allocateMessage(s, SM_OPCODE_MESSAGE, rawmsg->payload, rawmsg->payload_len);
+		Socketmessage* msg = (Socketmessage *) ((Byte*) rawmsg - offsetof(Socketmessage, rawmsg));
+		msg->s = s;
 		this->pushMessage(msg);
 	}
-#endif
 
 	void SocketServerInternal::pushMessage(Socketmessage* msg) {
 		std::lock_guard<std::mutex> guard(this->_wlocker);

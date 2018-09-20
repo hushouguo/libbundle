@@ -191,7 +191,9 @@ BEGIN_NAMESPACE_BUNDLE {
 		Trace.cout("    libbundle: %d.%d.%d", BUNDLE_VERSION_MAJOR, BUNDLE_VERSION_MINOR, BUNDLE_VERSION_PATCH);
 
 #ifdef TC_VERSION_MAJOR		
-		Trace.cout("    gperftools: %d.%d%s", TC_VERSION_MAJOR, TC_VERSION_MINOR, TC_VERSION_PATCH);
+		Trace.cout("    tcmalloc: %d.%d%s", TC_VERSION_MAJOR, TC_VERSION_MINOR, TC_VERSION_PATCH);
+#else
+		Trace.cout("    not link tcmalloc");
 #endif
 
 #ifdef LIBEVENT_VERSION

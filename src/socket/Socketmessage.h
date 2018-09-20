@@ -24,6 +24,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	};
 #pragma pack(pop)
 	Socketmessage* allocateMessage(SOCKET s, u8 opcode);
+	Socketmessage* allocateMessage(SOCKET s, u8 opcode, size_t payload_len);
 	Socketmessage* allocateMessage(SOCKET s, u8 opcode, const void* payload, size_t payload_len);
 	void releaseMessage(Socketmessage* msg);
 }

@@ -175,7 +175,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	void EasyMessage::cout(const char* format, ...) {
-		char log[65535];
+		char log[65536];
 		va_list va;
 		va_start(va, format);
 		int len = vsnprintf(log, sizeof(log), format, va);

@@ -17,6 +17,15 @@ BEGIN_NAMESPACE_BUNDLE {
 		return msg;
 	}
 
+	Socketmessage* allocateMessage(SOCKET s, u8 opcode, size_t payload_len) {
+		Socketmessage* msg = (Socketmessage*) ::malloc(sizeof(Socketmessage) + sizeof(Rawmessage) + payload_len);
+		msg->magic = MAGIC;
+		msg->s = s;
+		msg->opcode = opcode;
+		msg->rawmsg->payload_len = payload_len;
+		return msg;
+	}
+
 	Socketmessage* allocateMessage(SOCKET s, u8 opcode, const void* payload, size_t payload_len) {
 		Socketmessage* msg = (Socketmessage*) ::malloc(sizeof(Socketmessage) + sizeof(Rawmessage) + payload_len);
 		msg->magic = MAGIC;

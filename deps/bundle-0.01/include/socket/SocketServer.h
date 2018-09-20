@@ -23,6 +23,9 @@ BEGIN_NAMESPACE_BUNDLE {
 			virtual void stop() = 0;
 			virtual Rawmessage* receiveMessage(SOCKET& s, bool& establish, bool& close) = 0;
 			virtual void sendMessage(SOCKET s, const void*, size_t) = 0;
+			virtual Rawmessage* initMessage(size_t) = 0;
+			virtual void* getMessageData(Rawmessage*) = 0;
+			virtual void sendMessage(SOCKET s, const Rawmessage*) = 0;
 			virtual void releaseMessage(Rawmessage*) = 0;
 			virtual void close(SOCKET s) = 0;
 			virtual size_t size() = 0;

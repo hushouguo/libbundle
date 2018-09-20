@@ -17,6 +17,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	u64 timeMillisecond();
 	const char* timestamp(char* buf, size_t len, u64 seconds = 0, const char* time_format = nullptr);
 
+
 	// string
 	u32 hashString(const char* s);
 	u32 hashString(const char* s, size_t len);

@@ -18,6 +18,9 @@ BEGIN_NAMESPACE_BUNDLE {
 			virtual bool active() = 0;
 			virtual Rawmessage* receiveMessage(bool& establish, bool& close) = 0;
 			virtual void sendMessage(const void*, size_t) = 0;
+			virtual Rawmessage* initMessage(size_t) = 0;
+			virtual void* getMessageData(Rawmessage*) = 0;
+			virtual void sendMessage(const Rawmessage*) = 0;
 			virtual void releaseMessage(Rawmessage*) = 0;
 	};
 

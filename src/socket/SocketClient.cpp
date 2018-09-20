@@ -25,9 +25,11 @@ BEGIN_NAMESPACE_BUNDLE {
 			inline bool isstop() { return this->_stop; }
 			bool active() override;
 			inline bool connect_in_progress() { return this->_connect_in_progress; }
-			Rawmessage* receiveMessage(bool& establish, bool& close) override;
+			Rawmessage* receiveMessage(bool& establish, bool& close) override;			
 			void sendMessage(const void* payload, size_t payload_len) override;
-			//void sendMessage(const Rawmessage*) override;
+			Rawmessage* initMessage(size_t) override;
+			void* getMessageData(Rawmessage*) override;
+			void sendMessage(const Rawmessage*) override;
 			void releaseMessage(Rawmessage*) override;
 
 		public:
@@ -48,6 +50,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			std::list<Socketmessage *> _wlist;
 
 			bool connectServer();
+			void pushMessage(Socketmessage* msg);
 
 			std::function<int(const Byte*, size_t)> _splitMessage = nullptr;
 	};
@@ -204,20 +207,28 @@ BEGIN_NAMESPACE_BUNDLE {
 		assert(payload);
 		assert(payload_len > 0);
 		Socketmessage* msg = allocateMessage(this->fd(), SM_OPCODE_MESSAGE, payload, payload_len);
-		std::lock_guard<std::mutex> guard(this->_wlocker);
-		this->_wlist.push_back(msg);	
+		this->pushMessage(msg);
 	}
 
-#if 0
+	Rawmessage* SocketClientInternal::initMessage(size_t payload_len) {
+		Socketmessage* msg = allocateMessage(this->fd(), SM_OPCODE_MESSAGE, payload_len);
+		return msg->rawmsg;		
+	}
+
+	void* SocketClientInternal::getMessageData(Rawmessage* rawmsg) {
+		return rawmsg->payload;
+	}
+	
 	void SocketClientInternal::sendMessage(const Rawmessage* rawmsg) {
-		assert(rawmsg);
-		assert(rawmsg->payload_len > 0);
-		Socketmessage* msg = allocateMessage(this->fd(), SM_OPCODE_MESSAGE, rawmsg->payload, rawmsg->payload_len);
+		Socketmessage* msg = (Socketmessage *) ((Byte*) rawmsg - offsetof(Socketmessage, rawmsg));
+		this->pushMessage(msg);
+	}
+
+	void SocketClientInternal::pushMessage(Socketmessage* msg) {
 		std::lock_guard<std::mutex> guard(this->_wlocker);
 		this->_wlist.push_back(msg);
 	}
-#endif
-
+	
 	void SocketClientInternal::releaseMessage(Rawmessage* rawmsg) {
 		Socketmessage* msg = (Socketmessage *) ((Byte*) rawmsg - offsetof(Socketmessage, rawmsg));
 		bundle::releaseMessage(msg);
