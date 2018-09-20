@@ -6,22 +6,25 @@
 #ifndef __EASYLOG_H__
 #define __EASYLOG_H__
 
+//#define HAS_LOG_LAYOUT
 BEGIN_NAMESPACE_BUNDLE {
 	enum EasylogSeverityLevel {
-		GLOBAL	=	0,
-		TRACE	=	1,
-		ALARM	=	2,
-		ERROR	=	3,
-		PANIC	=	4,
-		SYSTEM	=	5,
-		MAX_LEVEL =	6,
+		GLOBAL			=	0,
+		LEVEL_DEBUG		=	1,
+		LEVEL_TRACE		=	2,
+		LEVEL_ALARM		=	3,
+		LEVEL_ERROR		=	4,
+		LEVEL_PANIC		=	5,
+		LEVEL_SYSTEM	=	6,
+		MAX_LEVEL 		=	7,
 	};
 
-#define Trace	bundle::EasylogMessage(bundle::Easylog::syslog(), bundle::TRACE, __FILE__, __LINE__, __FUNCTION__)
-#define Alarm	bundle::EasylogMessage(bundle::Easylog::syslog(), bundle::ALARM, __FILE__, __LINE__, __FUNCTION__)
-#define Error	bundle::EasylogMessage(bundle::Easylog::syslog(), bundle::ERROR, __FILE__, __LINE__, __FUNCTION__)
-#define Panic	bundle::EasylogMessage(bundle::Easylog::syslog(), bundle::PANIC, __FILE__, __LINE__, __FUNCTION__)
-#define System	bundle::EasylogMessage(bundle::Easylog::syslog(), bundle::SYSTEM, __FILE__, __LINE__, __FUNCTION__)
+#define Debug	bundle::EasylogMessage(bundle::Easylog::syslog(), bundle::LEVEL_DEBUG, __FILE__, __LINE__, __FUNCTION__)
+#define Trace	bundle::EasylogMessage(bundle::Easylog::syslog(), bundle::LEVEL_TRACE, __FILE__, __LINE__, __FUNCTION__)
+#define Alarm	bundle::EasylogMessage(bundle::Easylog::syslog(), bundle::LEVEL_ALARM, __FILE__, __LINE__, __FUNCTION__)
+#define Error	bundle::EasylogMessage(bundle::Easylog::syslog(), bundle::LEVEL_ERROR, __FILE__, __LINE__, __FUNCTION__)
+#define Panic	bundle::EasylogMessage(bundle::Easylog::syslog(), bundle::LEVEL_PANIC, __FILE__, __LINE__, __FUNCTION__)
+#define System	bundle::EasylogMessage(bundle::Easylog::syslog(), bundle::LEVEL_SYSTEM, __FILE__, __LINE__, __FUNCTION__)
 
 #ifdef assert
 #undef assert
@@ -30,8 +33,6 @@ BEGIN_NAMESPACE_BUNDLE {
 		do {\
 			if (!(condition)) {\
 				Panic.cout("Assert: %s", #condition);\
-				bundle::Easylog::syslog()->stop();\
-				::abort();\
 			}\
 		} while(0)
 	
@@ -42,8 +43,6 @@ BEGIN_NAMESPACE_BUNDLE {
 		do {\
 			if (!(condition)) {\
 				Panic.cout("Assert: %s, %s:%d\ncondition: %s, " format, __FILE__, __FUNCTION__, __LINE__, #condition, ##__VA_ARGS__);\
-				bundle::Easylog::syslog()->stop();\
-				::abort();\
 			}\
 		} while(0)
 	
@@ -145,6 +144,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			void flush();
 	};
 
+	class EasylogLayoutNode;
 	class Easylog {
 		public:
 			virtual ~Easylog() = 0;
@@ -165,8 +165,8 @@ BEGIN_NAMESPACE_BUNDLE {
 			
 #ifdef HAS_LOG_LAYOUT			
 			virtual bool set_layout(EasylogSeverityLevel level, std::string layout) = 0;
-			virtual const std::list<LayoutNode*>& layout_prefix(EasylogSeverityLevel level) = 0;
-			virtual const std::list<LayoutNode*>& layout_postfix(EasylogSeverityLevel level) = 0;
+			virtual const std::list<EasylogLayoutNode*>& layout_prefix(EasylogSeverityLevel level) = 0;
+			virtual const std::list<EasylogLayoutNode*>& layout_postfix(EasylogSeverityLevel level) = 0;
 #endif			
 			virtual void stop() = 0;
 

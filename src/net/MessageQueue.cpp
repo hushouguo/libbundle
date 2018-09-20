@@ -118,7 +118,7 @@ except_exit:
 		this->sendMessage(rawmsg, clientid);
 	}
 
-#if 0
+//#if 0
 	void MessageQueue::sendRetcode(NetData::RC rc, uint32_t clientid)
 	{
 		NetData::ErrorCode errmsg;

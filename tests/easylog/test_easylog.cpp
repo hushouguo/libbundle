@@ -40,9 +40,12 @@ void test_easylog() {
 	Trace << "cstr: " << val_cstr;
 	Trace << "string: " << val_string;
 
+	Debug << "i am a debug log";
+	Trace << "i am a trace log";
 	Alarm << "i am a alarm log";
 	Error << "i am a error log";
-	Panic << "i am a panic log";
+	//Panic << "i am a panic log";
+	System << "i am a system log";
 
 	sleep(2);
 	
