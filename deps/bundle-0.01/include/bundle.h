@@ -282,7 +282,7 @@ BEGIN_NAMESPACE_BUNDLE {
 #include "csv/CsvReader.h"
 #include "csv/CsvParser.h"
 #include "config/Config.h"
-#include "socket/Rawmessage.h"
+#include "socket/Socketmessage.h"
 #include "socket/SocketServer.h"
 #include "socket/SocketClient.h"
 #include "socket/WebSocketServer.h"

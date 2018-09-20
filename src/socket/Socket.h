@@ -34,12 +34,12 @@ BEGIN_NAMESPACE_BUNDLE {
 		public:
 			bool receiveMessage(Socketmessage*& msg);
 			bool sendMessage();
-			bool sendMessage(Socketmessage* msg);
+			bool sendMessage(const Socketmessage* msg);
 			
 		private:
 			SOCKET _fd = BUNDLE_INVALID_SOCKET;
 			ByteBuffer _rbuffer, _wbuffer;
-			std::list<Socketmessage*> _sendlist;
+			std::list<const Socketmessage*> _sendlist;
 			std::function<int(const Byte*, size_t)> _splitMessage = nullptr;
 			bool splitMessage(Socketmessage*& msg);
 			

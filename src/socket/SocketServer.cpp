@@ -4,7 +4,6 @@
  */
 
 #include "bundle.h"
-#include "Socketmessage.h"
 #include "Helper.h"
 #include "Socket.h"
 #include "Poll.h"
@@ -22,12 +21,12 @@ BEGIN_NAMESPACE_BUNDLE {
 			bool start(const char* address, int port) override;
 			void stop() override;
 			inline bool isstop() { return this->_stop; }
-			Rawmessage* receiveMessage(SOCKET& s, bool& establish, bool& close) override;
-			Rawmessage* initMessage(size_t) override;
+			const Socketmessage* receiveMessage(SOCKET& s, bool& establish, bool& close) override;
+			Socketmessage* initMessage(size_t) override;
 			void sendMessage(SOCKET s, const void*, size_t) override;
-			void* getMessageData(Rawmessage*) override;
-			void sendMessage(SOCKET s, const Rawmessage*) override;
-			void releaseMessage(Rawmessage*) override;
+			void* getMessageData(Socketmessage*) override;
+			void sendMessage(SOCKET s, const Socketmessage*) override;
+			void releaseMessage(const Socketmessage*) override;
 			void close(SOCKET s) override;
 			size_t size() override;
 			bool setsockopt(int opt, const void* optval, size_t optlen) override;
@@ -49,9 +48,9 @@ BEGIN_NAMESPACE_BUNDLE {
 			size_t _opts[BUNDLE_SOL_MAX], _size = 0;
 			
 			std::mutex _rlocker, _wlocker;
-			std::list<Socketmessage *> _rlist;
-			std::list<Socketmessage *> _wlist;
-			void pushMessage(Socketmessage* msg);
+			std::list<const Socketmessage *> _rlist;
+			std::list<const Socketmessage *> _wlist;
+			void pushMessage(const Socketmessage* msg);
 
 			std::function<int(const Byte*, size_t)> _splitMessage = nullptr;
 	};
@@ -185,23 +184,23 @@ BEGIN_NAMESPACE_BUNDLE {
 			}
 		};
 
-		auto writeMessage = [&](SOCKET s, Socketmessage* msg) {
+		auto writeMessage = [&](SOCKET s, const Socketmessage* msg) {
 			Socket* so = getSocket(s);
 			if (so && !so->sendMessage(msg)) {
 				removeSocket(s);
 			}
 		};
 
-		auto broadcastMessage = [&](Socketmessage* msg) {
+		auto broadcastMessage = [&](const Socketmessage* msg) {
 			assert(msg);
-			assert(msg->rawmsg->payload_len > 0);
+			assert(msg->payload_len > 0);
 			for (SOCKET s = 0; s < maxfd; ++s) {
 				Socket* so = getSocket(s);
 				if (!so) { 
 					continue;
 				}
 
-				Socketmessage* newmsg = allocateMessage(s, msg->opcode, msg->rawmsg->payload, msg->rawmsg->payload_len);
+				Socketmessage* newmsg = allocateMessage(s, msg->opcode, msg->payload, msg->payload_len);
 				writeMessage(s, newmsg);
 			}
 			bundle::releaseMessage(msg);
@@ -242,7 +241,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			}
 
 			while (!this->_wlist.empty() && this->_wlocker.try_lock()) {
-				Socketmessage* msg = this->_wlist.front();
+				const Socketmessage* msg = this->_wlist.front();
 				this->_wlist.pop_front();
 				this->_wlocker.unlock();
 				assert(msg->magic == MAGIC);
@@ -291,20 +290,20 @@ BEGIN_NAMESPACE_BUNDLE {
 
 	////////////////////////////////////////////////////////////////////////////////////////
 	
-	Rawmessage* SocketServerInternal::receiveMessage(SOCKET& s, bool& establish, bool& close) {
+	const Socketmessage* SocketServerInternal::receiveMessage(SOCKET& s, bool& establish, bool& close) {
 		s = BUNDLE_INVALID_SOCKET;
 		establish = close = false;
 		if (!this->_rlist.empty() && this->_rlocker.try_lock()) {
-			Socketmessage* msg = this->_rlist.front();
+			const Socketmessage* msg = this->_rlist.front();
 			this->_rlist.pop_front();
 			this->_rlocker.unlock();
 			assert(msg->magic == MAGIC);
 			assert(msg->s != BUNDLE_INVALID_SOCKET);
 			s = msg->s;
 			switch (msg->opcode) {
-				case SM_OPCODE_ESTABLISH: establish = true; return msg->rawmsg;
-				case SM_OPCODE_CLOSE: close = true; return msg->rawmsg;
-				case SM_OPCODE_MESSAGE: return msg->rawmsg;
+				case SM_OPCODE_ESTABLISH: establish = true; return msg;
+				case SM_OPCODE_CLOSE: close = true; return msg;
+				case SM_OPCODE_MESSAGE: return msg;
 				default: Error.cout("illegal opcode: %d", msg->opcode); break;
 			}
 		}
@@ -316,8 +315,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		this->pushMessage(msg);
 	}
 	
-	void SocketServerInternal::releaseMessage(Rawmessage* rawmsg) {
-		Socketmessage* msg = (Socketmessage *) ((Byte*) rawmsg - offsetof(Socketmessage, rawmsg));
+	void SocketServerInternal::releaseMessage(const Socketmessage* msg) {
 		bundle::releaseMessage(msg);
 	}
 
@@ -328,22 +326,22 @@ BEGIN_NAMESPACE_BUNDLE {
 		this->pushMessage(msg);
 	}
 
-	Rawmessage* SocketServerInternal::initMessage(size_t payload_len) {
+	Socketmessage* SocketServerInternal::initMessage(size_t payload_len) {
 		Socketmessage* msg = allocateMessage(BUNDLE_INVALID_SOCKET, SM_OPCODE_MESSAGE, payload_len);
-		return msg->rawmsg;
+		return msg;
 	}
 
-	void* SocketServerInternal::getMessageData(Rawmessage* rawmsg) {
-		return rawmsg->payload;
+	void* SocketServerInternal::getMessageData(Socketmessage* msg) {
+		return msg->payload;
 	}
 	
-	void SocketServerInternal::sendMessage(SOCKET s, const Rawmessage* rawmsg) {
-		Socketmessage* msg = (Socketmessage *) ((Byte*) rawmsg - offsetof(Socketmessage, rawmsg));
-		msg->s = s;
+	void SocketServerInternal::sendMessage(SOCKET s, const Socketmessage* msg) {
+		//TODO: msg->s = s;
+		((Socketmessage*) msg)->s = s;
 		this->pushMessage(msg);
 	}
 
-	void SocketServerInternal::pushMessage(Socketmessage* msg) {
+	void SocketServerInternal::pushMessage(const Socketmessage* msg) {
 		std::lock_guard<std::mutex> guard(this->_wlocker);
 		this->_wlist.push_back(msg);
 	}

@@ -4,7 +4,6 @@
  */
 
 #include "bundle.h"
-#include "Socketmessage.h"
 #include "Helper.h"
 #include "Socket.h"
 #include "Poll.h"
@@ -25,12 +24,12 @@ BEGIN_NAMESPACE_BUNDLE {
 			inline bool isstop() { return this->_stop; }
 			bool active() override;
 			inline bool connect_in_progress() { return this->_connect_in_progress; }
-			Rawmessage* receiveMessage(bool& establish, bool& close) override;			
+			const Socketmessage* receiveMessage(bool& establish, bool& close) override;			
 			void sendMessage(const void* payload, size_t payload_len) override;
-			Rawmessage* initMessage(size_t) override;
-			void* getMessageData(Rawmessage*) override;
-			void sendMessage(const Rawmessage*) override;
-			void releaseMessage(Rawmessage*) override;
+			Socketmessage* initMessage(size_t) override;
+			void* getMessageData(Socketmessage*) override;
+			void sendMessage(const Socketmessage*) override;
+			void releaseMessage(const Socketmessage*) override;
 
 		public:
 			void clientProcess();
@@ -46,11 +45,11 @@ BEGIN_NAMESPACE_BUNDLE {
 			int _port = 0;
 			
 			std::mutex _rlocker, _wlocker;
-			std::list<Socketmessage *> _rlist;
-			std::list<Socketmessage *> _wlist;
+			std::list<const Socketmessage *> _rlist;
+			std::list<const Socketmessage *> _wlist;
 
 			bool connectServer();
-			void pushMessage(Socketmessage* msg);
+			void pushMessage(const Socketmessage* msg);
 
 			std::function<int(const Byte*, size_t)> _splitMessage = nullptr;
 	};
@@ -149,7 +148,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			}
 		};
 
-		auto writeMessage = [&](SOCKET s, Socketmessage* msg) {
+		auto writeMessage = [&](SOCKET s, const Socketmessage* msg) {
 			Socket* so = getSocket(s);
 			if (so && !so->sendMessage(msg)) {
 				removeSocket(s);
@@ -166,7 +165,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			else {
 				addSocket(this->fd());
 				while (!this->_wlist.empty() && this->active() && this->_wlocker.try_lock()) {
-					Socketmessage* msg = this->_wlist.front();
+					const Socketmessage* msg = this->_wlist.front();
 					this->_wlist.pop_front();
 					this->_wlocker.unlock();
 					assert(msg->magic == MAGIC);
@@ -186,17 +185,17 @@ BEGIN_NAMESPACE_BUNDLE {
 
 	//////////////////////////////////////////////////////////////////////////////////
 	
-	Rawmessage* SocketClientInternal::receiveMessage(bool& establish, bool& close) {
+	const Socketmessage* SocketClientInternal::receiveMessage(bool& establish, bool& close) {
 		establish = close = false;
 		if (!this->_rlist.empty() && this->_rlocker.try_lock()) {
-			Socketmessage* msg = this->_rlist.front();
+			const Socketmessage* msg = this->_rlist.front();
 			this->_rlist.pop_front();
 			this->_rlocker.unlock();
 			assert(msg->magic == MAGIC);
 			switch (msg->opcode) {
-				case SM_OPCODE_ESTABLISH: establish = true; return msg->rawmsg;
-				case SM_OPCODE_CLOSE: close = true; return msg->rawmsg;
-				case SM_OPCODE_MESSAGE: return msg->rawmsg;
+				case SM_OPCODE_ESTABLISH: establish = true; return msg;
+				case SM_OPCODE_CLOSE: close = true; return msg;
+				case SM_OPCODE_MESSAGE: return msg;
 				default: Error.cout("illegal opcode: %d", msg->opcode); break;
 			}
 		}
@@ -210,27 +209,27 @@ BEGIN_NAMESPACE_BUNDLE {
 		this->pushMessage(msg);
 	}
 
-	Rawmessage* SocketClientInternal::initMessage(size_t payload_len) {
+	Socketmessage* SocketClientInternal::initMessage(size_t payload_len) {
 		Socketmessage* msg = allocateMessage(this->fd(), SM_OPCODE_MESSAGE, payload_len);
-		return msg->rawmsg;		
+		return msg;
 	}
 
-	void* SocketClientInternal::getMessageData(Rawmessage* rawmsg) {
-		return rawmsg->payload;
+	void* SocketClientInternal::getMessageData(Socketmessage* msg) {
+		return msg->payload;
 	}
 	
-	void SocketClientInternal::sendMessage(const Rawmessage* rawmsg) {
-		Socketmessage* msg = (Socketmessage *) ((Byte*) rawmsg - offsetof(Socketmessage, rawmsg));
+	void SocketClientInternal::sendMessage(const Socketmessage* msg) {
+		//Socketmessage* msg = (Socketmessage *) ((Byte*) rawmsg - offsetof(Socketmessage, rawmsg));
 		this->pushMessage(msg);
 	}
 
-	void SocketClientInternal::pushMessage(Socketmessage* msg) {
+	void SocketClientInternal::pushMessage(const Socketmessage* msg) {
 		std::lock_guard<std::mutex> guard(this->_wlocker);
 		this->_wlist.push_back(msg);
 	}
 	
-	void SocketClientInternal::releaseMessage(Rawmessage* rawmsg) {
-		Socketmessage* msg = (Socketmessage *) ((Byte*) rawmsg - offsetof(Socketmessage, rawmsg));
+	void SocketClientInternal::releaseMessage(const Socketmessage* msg) {
+		//Socketmessage* msg = (Socketmessage *) ((Byte*) rawmsg - offsetof(Socketmessage, rawmsg));
 		bundle::releaseMessage(msg);
 	}
 	

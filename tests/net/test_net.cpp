@@ -34,8 +34,8 @@ void createServer(u32 msgsize) {
 		while (n < N) {
 			SOCKET s = -1;
 			bool establish = false, close = false;
-			Rawmessage* rawmsg = ss->receiveMessage(s, establish, close);
-			if (rawmsg) {
+			const Socketmessage* msg = ss->receiveMessage(s, establish, close);
+			if (msg) {
 				if (establish) {
 					//fprintf(stderr, "SocketServer: establish: %d\n", s);
 				}
@@ -46,7 +46,7 @@ void createServer(u32 msgsize) {
 					//printf("receive rawmsg: %d from SOCKET: %d\n", rawmsg->payload_len, s);
 					++n;
 				}
-				ss->releaseMessage(rawmsg);
+				ss->releaseMessage(msg);
 			}
 			else {
 				std::this_thread::sleep_for(std::chrono::milliseconds(1));	
@@ -75,7 +75,7 @@ void createClient(u32 msgsize) {
 	struct timeval ta, tb, tc;
 	for (u32 i = 0; i < N; ++i) {
 		gettimeofday(&ta, nullptr);
-		Rawmessage* msg = cs->initMessage(msgsize);
+		Socketmessage* msg = cs->initMessage(msgsize);
 		gettimeofday(&tb, nullptr);
 		cs->sendMessage(msg);
 		gettimeofday(&tc, nullptr);

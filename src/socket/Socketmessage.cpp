@@ -4,7 +4,6 @@
  */
 
 #include "bundle.h"
-#include "Socketmessage.h"
 
 BEGIN_NAMESPACE_BUNDLE {
 	//static std::atomic<int> allocated_messages = 0;
@@ -38,7 +37,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		return msg;
 	}
 	
-	void releaseMessage(Socketmessage* msg) {
+	void releaseMessage(const Socketmessage* msg) {
 		assert(msg->magic == MAGIC);
 		SafeFree(msg);
 	}

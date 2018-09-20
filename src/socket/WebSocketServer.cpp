@@ -4,7 +4,6 @@
  */
 
 #include "bundle.h"
-#include "Socketmessage.h"
 #include "Helper.h"
 #include "Socket.h"
 
@@ -46,10 +45,10 @@ BEGIN_NAMESPACE_BUNDLE {
 			SOCKET fd() override {	return this->_socketServer->fd(); }
 			bool start(const char* address, int port) override { return this->_socketServer->start(address, port); }
 			void stop() override { this->_socketServer->stop(); }
-			Rawmessage* receiveMessage(SOCKET& s, bool& establish, bool& close) override;
+			const Socketmessage* receiveMessage(SOCKET& s, bool& establish, bool& close) override;
 			void sendMessage(SOCKET s, const void*, size_t) override;
-			//void sendMessage(SOCKET s, const Rawmessage*) override;
-			void releaseMessage(Rawmessage* rawmsg) override { this->_socketServer->releaseMessage(rawmsg); }
+			//void sendMessage(SOCKET s, const Socketmessage*) override;
+			void releaseMessage(const Socketmessage* msg) override { this->_socketServer->releaseMessage(msg); }
 			void close(SOCKET s) override { this->_socketServer->close(s); }
 			size_t size() override { return this->_socketServer->size(); }
 			bool setsockopt(int opt, const void* optval, size_t optlen) override { return this->_socketServer->setsockopt(opt, optval, optlen); }
@@ -60,7 +59,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			int parse_handshake_request(const Byte* buffer, size_t len, std::string& Sec_WebSocket_Key);
 			void send_handshake_response(SOCKET s, const std::string& Sec_WebSocket_Key);
 			int parsePackage(const Byte* buffer, size_t len);
-			bool parsePackage(SOCKET s, Rawmessage*& rawmsg, bool& forward);
+			bool parsePackage(SOCKET s, Socketmessage*& msg, bool& forward);
 			void sendPing(SOCKET s);
 			void sendPong(SOCKET s);
 	};
@@ -128,55 +127,55 @@ BEGIN_NAMESPACE_BUNDLE {
 		this->_socketServer->sendMessage(s, buffer, len);
 	}
 
-//	void WebSocketServerInternal::sendMessage(SOCKET s, const Rawmessage*) {
+//	void WebSocketServerInternal::sendMessage(SOCKET s, const Socketmessage*) {
 //	}
 
 	/////////////////////////////////////////////////////////////////
 	
-	Rawmessage* WebSocketServerInternal::receiveMessage(SOCKET& s, bool& establish, bool& close) {
-        Rawmessage* rawmsg = this->_socketServer->receiveMessage(s, establish, close);
-        if (!rawmsg) {
+	const Socketmessage* WebSocketServerInternal::receiveMessage(SOCKET& s, bool& establish, bool& close) {
+        Socketmessage* msg = (Socketmessage *) this->_socketServer->receiveMessage(s, establish, close);
+        if (!msg) {
         	return nullptr;
         }
 
         if (establish) {
-        	this->_socketServer->releaseMessage(rawmsg);
+        	this->_socketServer->releaseMessage(msg);
         	return nullptr; // Websocket needs to wait for the handshake to establish.
         }
 
         if (close) {
-        	return rawmsg;	// disconnect
+        	return msg;	// disconnect
         }
 
-		if (rawmsg->payload_len >= 3 && rawmsg->payload[0] == 'G' && rawmsg->payload[1] == 'E' && rawmsg->payload[2] == 'T') {	// GET
+		if (msg->payload_len >= 3 && msg->payload[0] == 'G' && msg->payload[1] == 'E' && msg->payload[2] == 'T') {	// GET
 			std::string Sec_WebSocket_Key;
-			int len = this->parse_handshake_request(rawmsg->payload, rawmsg->payload_len, Sec_WebSocket_Key);
-			assert(len > 0 && size_t(len) == rawmsg->payload_len);
+			int len = this->parse_handshake_request(msg->payload, msg->payload_len, Sec_WebSocket_Key);
+			assert(len > 0 && size_t(len) == msg->payload_len);
 			this->send_handshake_response(s, Sec_WebSocket_Key);
 			establish = true, close = false;
-			return rawmsg;
+			return msg;
 		}
 
 		bool forward = false;
-		if (!this->parsePackage(s, rawmsg, forward)) {
+		if (!this->parsePackage(s, msg, forward)) {
 			this->_socketServer->close(s);
-			this->_socketServer->releaseMessage(rawmsg);
+			this->_socketServer->releaseMessage(msg);
 			return nullptr;
 		}
 
 		if (!forward) {
-			this->_socketServer->releaseMessage(rawmsg);
+			this->_socketServer->releaseMessage(msg);
 			return nullptr;
 		}
 
-		return rawmsg;
+		return msg;
 	}
 
-	bool WebSocketServerInternal::parsePackage(SOCKET s, Rawmessage*& rawmsg, bool& forward) {
+	bool WebSocketServerInternal::parsePackage(SOCKET s, Socketmessage*& msg, bool& forward) {
 		size_t offset = sizeof(WS_HEADER);
-		CHECK_RETURN(rawmsg->payload_len >= offset, false, "illegal WS_PACKAGE size");
+		CHECK_RETURN(msg->payload_len >= offset, false, "illegal WS_PACKAGE size");
 
-		WS_HEADER* header = (WS_HEADER *) rawmsg->payload;
+		WS_HEADER* header = (WS_HEADER *) msg->payload;
 		CHECK_RETURN(header->RSV1 == 0, false, "illegal WS_PACKAGE RSV1");
 		CHECK_RETURN(header->RSV2 == 0, false, "illegal WS_PACKAGE RSV2");
 		CHECK_RETURN(header->RSV3 == 0, false, "illegal WS_PACKAGE RSV3");
@@ -184,26 +183,26 @@ BEGIN_NAMESPACE_BUNDLE {
 
 		u64 payload_len = header->payload_len;
 		if (header->payload_len == 126) {
-			CHECK_RETURN(rawmsg->payload_len >= (offset + 2), false, "126, not enough data");
-			payload_len = ntohs(*(u16 *)(rawmsg->payload + offset));
+			CHECK_RETURN(msg->payload_len >= (offset + 2), false, "126, not enough data");
+			payload_len = ntohs(*(u16 *)(msg->payload + offset));
 			offset += 2;
 		}
 		else if (header->payload_len == 127) {
-			CHECK_RETURN(rawmsg->payload_len >= (offset + 8), false, "127, not enough data");
-			payload_len = ntohl(*(u64 *)(rawmsg->payload + offset));
+			CHECK_RETURN(msg->payload_len >= (offset + 8), false, "127, not enough data");
+			payload_len = ntohl(*(u64 *)(msg->payload + offset));
 			offset += 8;
 		}
 
 		Byte* mask = nullptr;
 		if (header->MASK == 1) {
-			CHECK_RETURN(rawmsg->payload_len >= (offset + 4), false, "mask, not enough data");
-			mask = rawmsg->payload + offset;
+			CHECK_RETURN(msg->payload_len >= (offset + 4), false, "mask, not enough data");
+			mask = msg->payload + offset;
 			offset += 4;
 		}
 
-		CHECK_RETURN(rawmsg->payload_len >= (offset + payload_len), false, "payload_len not enough");
+		CHECK_RETURN(msg->payload_len >= (offset + payload_len), false, "payload_len not enough");
 
-		Byte* data = rawmsg->payload + offset;
+		Byte* data = msg->payload + offset;
 		if (header->MASK == 1) {
 			for (size_t i = 0; i < payload_len; ++i) {
 				data[i] ^= mask[i % 4];
@@ -215,11 +214,11 @@ BEGIN_NAMESPACE_BUNDLE {
 			case WS_OPCODE_TEXT:
 			case WS_OPCODE_CONTINUE:
 				if (true) {
-					Socketmessage* msg = allocateMessage(s, SM_OPCODE_MESSAGE, rawmsg->payload + offset, payload_len);
-					this->_socketServer->releaseMessage(rawmsg);
-					//memmove(rawmsg->payload, rawmsg->payload + offset, payload_len);
-					//rawmsg->payload_len = payload_len;
-					rawmsg = msg->rawmsg;
+					Socketmessage* newmsg = allocateMessage(s, SM_OPCODE_MESSAGE, msg->payload + offset, payload_len);
+					this->_socketServer->releaseMessage(msg);
+					//memmove(msg->payload, msg->payload + offset, payload_len);
+					//msg->payload_len = payload_len;
+					msg = newmsg;
 					forward = true;
 				}
 				return true;

@@ -15,9 +15,9 @@ BEGIN_NAMESPACE_BUNDLE {
 			virtual SOCKET fd() = 0;
 			virtual bool start(const char* address, int port) = 0;
 			virtual void stop() = 0;
-			virtual Rawmessage* receiveMessage(SOCKET& s, bool& establish, bool& close) = 0;
+			virtual const Socketmessage* receiveMessage(SOCKET& s, bool& establish, bool& close) = 0;
 			virtual void sendMessage(SOCKET s, const void*, size_t) = 0;
-			virtual void releaseMessage(Rawmessage*) = 0;
+			virtual void releaseMessage(const Socketmessage*) = 0;
 			virtual void close(SOCKET s) = 0;
 			virtual size_t size() = 0;
 			virtual bool setsockopt(int opt, const void* optval, size_t optlen) = 0;

@@ -101,8 +101,8 @@ BEGIN_NAMESPACE_BUNDLE {
 			SOCKET s = -1;
 			bool is_establish = false, is_close = false;
 			bool rc = true;
-			Rawmessage* rawmsg = this->_socketServer->receiveMessage(s, is_establish, is_close);
-			if (rawmsg) {
+			const Socketmessage* msg = this->_socketServer->receiveMessage(s, is_establish, is_close);
+			if (msg) {
 				if (is_establish) {
 					NetworkTask* task = this->spawnConnection(s);
 					if (this->_establishConnection) {
@@ -124,11 +124,11 @@ BEGIN_NAMESPACE_BUNDLE {
 				else {
 					NetworkTask* task = FindOrNull(this->_tasks, s);
 					if (task && this->_msgParser) {
-						rc = this->_msgParser(this, task, (const Netmessage *) rawmsg->payload);
+						rc = this->_msgParser(this, task, (const Netmessage *) msg->payload);
 					}
 				}
 				if (rc) {
-					this->socketServer()->releaseMessage(rawmsg);
+					this->socketServer()->releaseMessage(msg);
 				}
 			}
 			else {
@@ -139,10 +139,10 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	void NetworkService::releaseMessage(const Netmessage* netmsg) {
-		Rawmessage* rawmsg = (Rawmessage *) ((Byte*) netmsg - offsetof(Rawmessage, payload));
-		assert(rawmsg->payload_len == netmsg->len);
+		Socketmessage* msg = (Socketmessage *) ((Byte*) netmsg - offsetof(Socketmessage, payload));
+		assert(msg->payload_len == netmsg->len);
 		assert(this->socketServer());
-		this->socketServer()->releaseMessage(rawmsg);
+		this->socketServer()->releaseMessage(msg);
 	}
 
 	void NetworkService::close(NetworkInterface* task) {

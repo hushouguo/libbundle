@@ -4,7 +4,6 @@
  */
 
 #include "bundle.h"
-#include "Socketmessage.h"
 #include "Helper.h"
 #include "Socket.h"
 
@@ -85,7 +84,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 	bool Socket::sendMessage() {
 		while (true) {
-			Socketmessage* msg = nullptr;
+			const Socketmessage* msg = nullptr;
 			const Byte* buffer = nullptr;
 			size_t len = 0;
 			if (this->_wbuffer.size() > 0) {
@@ -95,8 +94,8 @@ BEGIN_NAMESPACE_BUNDLE {
 			else if (!this->_sendlist.empty()) {
 				msg = this->_sendlist.front();
 				this->_sendlist.pop_front();
-				buffer = msg->rawmsg->payload;
-				len = msg->rawmsg->payload_len;
+				buffer = msg->payload;
+				len = msg->payload_len;
 			}
 			else { return true; }
 
@@ -134,11 +133,11 @@ BEGIN_NAMESPACE_BUNDLE {
 		return true;	
 	}
 	
-	bool Socket::sendMessage(Socketmessage* msg) {
+	bool Socket::sendMessage(const Socketmessage* msg) {
 		assert(msg);
 		assert(msg->magic == MAGIC);
 		assert(msg->s == this->fd());
-		assert(msg->rawmsg->payload_len > 0);
+		assert(msg->payload_len > 0);
 		this->_sendlist.push_back(msg);
 		return this->sendMessage();
 	}
