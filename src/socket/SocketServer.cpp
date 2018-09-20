@@ -346,20 +346,33 @@ BEGIN_NAMESPACE_BUNDLE {
 			if (this->_threadAccept && this->_threadAccept->joinable()) {
 				this->_threadAccept->join();
 			}
-			
+
 			if (this->_threadConnection && this->_threadConnection->joinable()) {
 				this->_threadConnection->join();
 			}
 
-			// release rlist&wlist messages
+			// release rlist messages
 			for (auto& msg : this->_rlist) {
 				bundle::releaseMessage(msg);
 			}
 
+			// release wlist messages
 			for (auto& msg : this->_wlist) {
 				bundle::releaseMessage(msg);
 			}
-			
+
+			// close connection
+			for (auto s : this->_connfds) {
+				::close(s);
+			}
+
+			// close listening port
+			if (this->_fd != BUNDLE_INVALID_SOCKET) {
+				::close(this->_fd);
+				this->_fd = BUNDLE_INVALID_SOCKET;
+			}
+
+			// destroy accept thread & i/o thread
 			SafeDelete(this->_threadAccept);
 			SafeDelete(this->_threadConnection);
 		}

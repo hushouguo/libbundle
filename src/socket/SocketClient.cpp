@@ -230,15 +230,23 @@ BEGIN_NAMESPACE_BUNDLE {
 				this->_threadClient->join();
 			}
 
-			// release rlist&wlist messages
+			// release rlist messages
 			for (auto& msg : this->_rlist) {
 				bundle::releaseMessage(msg);
 			}
 
+			// release wlist messages
 			for (auto& msg : this->_wlist) {
 				bundle::releaseMessage(msg);
 			}
 
+			// close connected port
+			if (this->_fd != BUNDLE_INVALID_SOCKET) {
+				::close(this->_fd);
+				this->_fd = BUNDLE_INVALID_SOCKET;
+			}
+
+			// destroy client thread
 			SafeDelete(this->_threadClient);
 		}
 	}

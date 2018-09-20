@@ -6,26 +6,26 @@
 #include "bundle.h"
 
 using namespace bundle;
-void test_net() {
-	SocketServer* ss = SocketServerCreator::create([=](const Byte* buffer, size_t len) -> int{
-			return len;
+
+Time t1, t2;
+u32 N = 100;
+
+SocketServer* ss = nullptr;
+SocketClient* cs = nullptr;
+std::thread* loop = nullptr;
+
+void createServer(u32 msgsize) {
+	ss = SocketServerCreator::create([=](const Byte* buffer, size_t len) -> int{
+			return len >= msgsize ? msgsize : 0;
 			});
 	assert(ss);
 	bool rc = ss->start("0.0.0.0", 12306);
 	assert(rc);
-	
-	SocketClient* cs = SocketClientCreator::create([](const Byte* buffer, size_t len) -> int{
-			return len;
-			});
-	assert(cs);
-	rc = cs->connect("127.0.0.1", 12306, true);
-	assert(rc);
 
-	SOCKET s = -1;
-	auto socketserver_run = [ss, &s]() -> char {
-		char c = 0;
-		while (true) {
-			//SOCKET s = -1;
+	auto runnable = []() {
+		u32 n = 0;
+		while (n < N) {
+			SOCKET s = -1;
 			bool establish = false, close = false;
 			Rawmessage* rawmsg = ss->receiveMessage(s, establish, close);
 			if (rawmsg) {
@@ -37,72 +37,57 @@ void test_net() {
 				}
 				else {
 					//printf("receive rawmsg: %d from SOCKET: %d\n", rawmsg->payload_len, s);
-					if (rawmsg->payload_len > 0) {
-						c = rawmsg->payload[0];
-						break;
-						//fprintf(stderr, "payload: %s\n", rawmsg->payload);
-					}
+					++n;
 				}
 				ss->releaseMessage(rawmsg);
 			}
 			else {
-				usleep(1);
-				//break;
+				std::this_thread::sleep_for(std::chrono::milliseconds(1));	
 			}
 		}
-		return c;
+
+		t2.now();
+	};
+	
+	SafeDelete(loop);
+	loop = new std::thread(runnable);
+}
+
+void createClient(u32 msgsize) {
+	cs = SocketClientCreator::create([=](const Byte* buffer, size_t len) -> int{
+			return len >= msgsize ? msgsize : 0;
+			});
+	assert(cs);
+	bool rc = cs->connect("127.0.0.1", 12306, true);
+	assert(rc);
+
+	char* buffer = (char*) malloc(msgsize);
+	assert(buffer);
+
+	t1.now();
+
+	for (u32 i = 0; i < N; ++i) {
+		cs->sendMessage(buffer, msgsize);
+	}
+
+	delete buffer;
+}
+
+void test_net() {
+	u32 sizes[] = {
+		4*KB, 8*KB, 16*KB, 32*KB, 64*KB, 128*KB, 256*KB, 512*KB, 
+		1*MB, 2*MB, 4*MB, 8*MB, 16*MB, 32*MB, 64*MB, 128*MB, 256*MB
 	};
 
-	auto socketclient_run = [cs]() -> char {
-		char c = 0;
-		while (true) {
-			bool establish = false, close = false;
-			Rawmessage* rawmsg = cs->receiveMessage(establish, close);
-			if (rawmsg) {
-				if (establish) {
-					//fprintf(stderr, "SocketClient: establish\n");
-				}
-				else if (close) {
-					//fprintf(stderr, "SocketClient: disconnect\n");
-				}
-				else {
-					//printf("receive rawmsg: %d \n", rawmsg->payload_len);
-					if (rawmsg->payload_len > 0) {
-						//printf("payload: %s\n", rawmsg->payload);
-						c = rawmsg->payload[0];
-						break;
-					}
-				}
-				cs->releaseMessage(rawmsg);
-			}
-			else {
-				usleep(1);
-				//break;
-			}
-		}
-		return c;
-	};
-
-	char c = 'a';
-	cs->sendMessage(&c, sizeof(c));
-	char res = socketserver_run();
-	if (c == res) {
-		Trace << "client to server result OK";
+	for (auto size : sizes) {
+		createServer(size);
+		createClient(size);
+		loop->join();
+		Trace << "benchmark: net i/o count: " << N << " messages, message size: " << size << ", cost milliseconds: " << t2 - t1;
+		SafeDelete(cs);
+		SafeDelete(ss);
 	}
-	else {
-		Error << "client to server result Fail";
-	}
-	ss->sendMessage(s, &c, sizeof(c));
-	res = socketclient_run();
-	if (c == res) {
-		Trace << "server to client result OK";
-	}
-	else {
-		Error << "server to client result Fail";
-	}
-
-	SafeDelete(ss);
-	SafeDelete(cs);
 
 	System << "test net OK";
 }
+

@@ -15,7 +15,7 @@
 int main() {
 	bundle::Easylog::syslog()->set_tostdout(bundle::GLOBAL, true);
 	//test_tools();
-	//test_net();
+	test_net();
 	//test_csv("./csv/test.csv");
 	//test_xml("./xml/conf.xml");
 	//test_xml("../server/recordserver/conf/db.xml");
