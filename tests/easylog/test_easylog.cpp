@@ -78,14 +78,14 @@ void test_easylog() {
 		Time t1;
 		performance_single_thread(1000000);
 		Time t2;
-		Trace << "performance: single thread cost milliseconds: " << t2 - t1 << ", times: 1,000,000";
+		fprintf(stderr, "performance: single thread cost milliseconds: %ld, times: 1,000,000", t2 - t1);
 	}
 
 	if (true) {
 		Time t1;
 		performance_multi_thread(8, 500000);
 		Time t2;
-		Trace << "performance: 8 threads cost milliseconds: " << t2 - t1 << ", times: 500,000";
+		fprintf(stderr, "performance: 8 threads cost milliseconds: %ld, times: 500,000", t2 - t1);
 	}
 
 	//Easylog::syslog()->stop();

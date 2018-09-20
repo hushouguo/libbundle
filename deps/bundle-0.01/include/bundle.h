@@ -268,6 +268,8 @@ BEGIN_NAMESPACE_BUNDLE {
 #include "tools/ByteBuffer.h"
 #include "tools/Registry.h"
 #include "tools/Tools.h"
+#include "tools/Spinlocker.h"
+#include "tools/LockfreeQueue.h"
 #include "entry/Entry.h"
 #include "entry/Manager.h"
 #include "sha/sha1.h"
