@@ -707,6 +707,22 @@ dont_need_mkdir:
 	    }
 	    return true;
 	}
+	void setSignal(int sig) {
+		struct sigaction act;
+		// `sa_handler` will not take effect if it is not set
+		// default action:
+		// abort: SIGABRT,SIGBUS,SIGFPE,SIGILL,SIGIOT,SIGQUIT,SIGSEGV,SIGTRAP,SIGXCPU,SIGXFSZ
+		// exit: SIGALRM,SIGHUP,SIGINT,SIGKILL,SIGPIPE,SIGPOLL,SIGPROF,SIGSYS,SIGTERM,SIGUSR1,SIGUSR2,SIGVTALRM
+		// stop: SIGSTOP,SIGTSTP,SIGTTIN,SIGTTOU
+		// default ignore: SIGCHLD,SIGPWR,SIGURG,SIGWINCH
+        act.sa_handler = [](int) {
+			// Don't call Non reentrant function, just like malloc, free etc, i/o function also cannot call.
+		};
+        sigemptyset(&act.sa_mask);
+        sigaddset(&act.sa_mask, sig);
+        act.sa_flags = SA_INTERRUPT; //The system call that is interrupted by this signal will not be restarted automatically
+        sigaction(sig, &act, nullptr);
+	}
 
 #if 0
 	void printLibraryVersion()
@@ -771,72 +787,6 @@ dont_need_mkdir:
 		//if (sConfig.shardid == 0) {
 		//	log_alarm("`shardid` NOT SPECIFIED!");
 		//}
-	}
-#endif
-
-	//
-	// setup runtime environment
-	//
-
-#if 0
-	enum {
-		GUID_PLAYER		=	1,
-		GUID_MAIL		=	2,
-		GUID_ITEM		=	3,
-		GUID_TASK		=	4,
-		GUID_SCORE		=	5,
-		GUID_SIGN		=	6,
-		GUID_MAX		=	16
-	};
-
-#pragma pack(1)
-	union GUID {
-		struct {
-			uint32_t time_seconds;
-			union {
-				struct {
-					uint32_t autoid:12;
-					uint32_t shardid:16;
-					uint32_t tag:4;
-				};
-				uint32_t high;
-			};
-		};
-		uint64_t guid;
-	};
-#pragma pack()
-	
-	static uint64_t allocGUID(uint32_t tag)
-	{
-		static uint32_t __last_seconds = 0;
-		static uint32_t __last_autoid = 0;
-
-		uint32_t seconds = timeSeconds();
-		if (__last_seconds > seconds) {
-			++__last_seconds;
-			__last_autoid = 0;
-		}
-		else if (__last_seconds < seconds) {
-			__last_seconds = seconds;
-			__last_autoid = 0;
-		}
-		else { // equal current time
-			++__last_autoid;
-			if (__last_autoid >= 4096) {
-				++__last_seconds;
-				__last_autoid = 0;
-			}
-		}
-
-		GUID u;
-		
-		u.time_seconds = __last_seconds;
-		u.high = 0;
-		u.tag = tag;
-		u.shardid = sConfig.shardid;
-		u.autoid = __last_autoid;
-		
-		return u.guid;
 	}
 #endif
 }
