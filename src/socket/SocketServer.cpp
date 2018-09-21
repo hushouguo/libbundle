@@ -93,16 +93,18 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	void SocketServerInternal::acceptProcess() {
+		//blocking(this->_fd);
 		while (!this->isstop()) {
 			struct sockaddr_in clientaddr;
 			socklen_t len = sizeof(clientaddr);
 
-			SOCKET s = TEMP_FAILURE_RETRY(::accept(this->_fd, (struct sockaddr*)&clientaddr, &len));
+			SOCKET s = ::accept(this->_fd, (struct sockaddr*)&clientaddr, &len);
 			if (s == 0) {
 				CHECK_RETURN(false, void(0), "accept error:%d,%s", errno, strerror(errno));
 			}
 			else if (s < 0) {
 				if (interrupted()) {
+					fprintf(stderr, "acceptProcess receive EINTR\n");
 					continue;
 				}
 
@@ -344,9 +346,12 @@ BEGIN_NAMESPACE_BUNDLE {
 	
 	void SocketServerInternal::stop() {
 		if (!this->isstop()) {
-			this->_stop = true; 
-			if (this->_threadAccept && this->_threadAccept->joinable()) {
-				this->_threadAccept->join();
+			this->_stop = true;
+			if (this->_threadAccept) {
+				//pthread_kill(this->_threadAccept->native_handle(), SIGTERM);
+				if (this->_threadAccept->joinable()) {
+					this->_threadAccept->join();
+				}
 			}
 
 			if (this->_threadConnection && this->_threadConnection->joinable()) {

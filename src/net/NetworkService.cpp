@@ -231,7 +231,8 @@ BEGIN_NAMESPACE_BUNDLE {
 		sigemptyset(&act.sa_mask);
 		act.sa_flags = 0;
 		act.sa_handler = [](int sig) {
-			Alarm << "receive signal: " << sig;
+			//Alarm << "receive signal: " << sig;
+			fprintf(stderr, "receive signal: %d\n", sig);
 			switch (sig) {
 				case SIGHUP:
 					// reload configure
