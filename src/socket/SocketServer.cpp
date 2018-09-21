@@ -93,12 +93,22 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	void SocketServerInternal::acceptProcess() {
-		//blocking(this->_fd);
+		struct sigaction act;
+        act.sa_handler = [](int sig) {
+			Alarm << "acceptProcess receive signal: " << sig;
+		}; // sa_handler will not take effect if it is not set, different with connectSignal implement
+        sigemptyset(&act.sa_mask);  
+        sigaddset(&act.sa_mask, SIGTERM);
+        act.sa_flags = SA_INTERRUPT; //The system call that is interrupted by this signal will not be restarted automatically
+        sigaction(SIGTERM, &act, nullptr);
+
+		blocking(this->_fd);
 		while (!this->isstop()) {
 			struct sockaddr_in clientaddr;
 			socklen_t len = sizeof(clientaddr);
 
 			SOCKET s = ::accept(this->_fd, (struct sockaddr*)&clientaddr, &len);
+			fprintf(stderr, "::accept wakeup\n");
 			if (s == 0) {
 				CHECK_RETURN(false, void(0), "accept error:%d,%s", errno, strerror(errno));
 			}
@@ -109,7 +119,8 @@ BEGIN_NAMESPACE_BUNDLE {
 				}
 
 				if (wouldblock()) {
-					std::this_thread::sleep_for(std::chrono::milliseconds(1));
+					//std::this_thread::sleep_for(std::chrono::milliseconds(1));
+					fprintf(stderr, "acceptProcess receive EAGAIN\n");
 					continue; // no more connection
 				}
 
@@ -136,8 +147,6 @@ BEGIN_NAMESPACE_BUNDLE {
 		};
 
 		auto pushMessage = [&](Socketmessage* msg) {
-			//std::lock_guard<std::mutex> guard(this->_rlocker);
-			//this->_rlist.push_back(msg);
 			this->_rQueue.push_back(msg);
 		};
 		
@@ -235,7 +244,6 @@ BEGIN_NAMESPACE_BUNDLE {
 		while (!this->isstop()) {
 			checkConnection();
 			
-			//while (!this->_connfds.empty() && this->_fdslocker.try_lock()) {
 			while (!this->_connfds.empty()) {
 				this->_fdslocker.lock();
 				SOCKET s = this->_connfds.front();
@@ -244,11 +252,7 @@ BEGIN_NAMESPACE_BUNDLE {
 				addSocket(s);
 			}
 
-			//while (!this->_wlist.empty() && this->_wlocker.try_lock()) {
 			while (this->_wQueue.size() > 0) {
-				//const Socketmessage* msg = this->_wlist.front();
-				//this->_wlist.pop_front();
-				//this->_wlocker.unlock();
 				const Socketmessage* msg = this->_wQueue.pop_front();
 				assert(msg);
 				assert(msg->magic == MAGIC);
@@ -300,13 +304,8 @@ BEGIN_NAMESPACE_BUNDLE {
 	const Socketmessage* SocketServerInternal::receiveMessage(SOCKET& s, bool& establish, bool& close) {
 		s = BUNDLE_INVALID_SOCKET;
 		establish = close = false;
-		//if (!this->_rlist.empty() && this->_rlocker.try_lock()) {
 		const Socketmessage* msg = this->_rQueue.pop_front();
-		//if (this->_rQueue.size() > 0) {
 		if (msg) {
-			//const Socketmessage* msg = this->_rlist.front();
-			//this->_rlist.pop_front();
-			//this->_rlocker.unlock();
 			assert(msg->magic == MAGIC);
 			assert(msg->s != BUNDLE_INVALID_SOCKET);
 			s = msg->s;
@@ -314,7 +313,6 @@ BEGIN_NAMESPACE_BUNDLE {
 				case SM_OPCODE_ESTABLISH: establish = true; break;;
 				case SM_OPCODE_CLOSE: close = true; break;;
 				case SM_OPCODE_MESSAGE: break;;
-				//default: Error.cout("illegal opcode: %d", msg->opcode); break;
 				default: assert(false); break;
 			}
 		}
@@ -339,8 +337,6 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	void SocketServerInternal::pushMessage(const Socketmessage* msg) {
-		//std::lock_guard<std::mutex> guard(this->_wlocker);
-		//this->_wlist.push_back(msg);
 		this->_wQueue.push_back((Socketmessage*)msg);
 	}
 	
@@ -348,7 +344,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		if (!this->isstop()) {
 			this->_stop = true;
 			if (this->_threadAccept) {
-				//pthread_kill(this->_threadAccept->native_handle(), SIGTERM);
+				pthread_kill(this->_threadAccept->native_handle(), SIGTERM);
 				if (this->_threadAccept->joinable()) {
 					this->_threadAccept->join();
 				}
