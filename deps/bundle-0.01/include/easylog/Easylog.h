@@ -15,7 +15,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		PANIC	=	4,
 		SYSTEM	=	5,
 		MAX_LEVEL =	6,
-	};	
+	};
 
 #define Trace	bundle::EasyMessage(bundle::Easylog::syslog(), bundle::TRACE, __FILE__, __LINE__, __FUNCTION__)
 #define Alarm	bundle::EasyMessage(bundle::Easylog::syslog(), bundle::ALARM, __FILE__, __LINE__, __FUNCTION__)
@@ -75,6 +75,26 @@ BEGIN_NAMESPACE_BUNDLE {
 			continue;\
 		}
 	
+#define CHECK_TRACE(RC, MESSAGE, ...)	\
+			if (!(RC)) {\
+				Trace.cout(MESSAGE, ##__VA_ARGS__);\
+			}
+			
+#define CHECK_ALARM(RC, MESSAGE, ...)	\
+			if (!(RC)) {\
+				Alarm.cout(MESSAGE, ##__VA_ARGS__);\
+			}
+
+#define CHECK_ERROR(RC, MESSAGE, ...)	\
+			if (!(RC)) {\
+				Error.cout(MESSAGE, ##__VA_ARGS__);\
+			}
+
+#define CHECK_PANIC(RC, MESSAGE, ...)	\
+			if (!(RC)) {\
+				Panic.cout(MESSAGE, ##__VA_ARGS__);\
+			}
+
 	
 	enum EasylogColor { 
 		BLACK	=	30,

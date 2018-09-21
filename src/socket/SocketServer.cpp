@@ -121,7 +121,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			std::lock_guard<std::mutex> guard(this->_fdslocker);
 			this->_connfds.push_back(s);
 		}
-		Trace << "acceptProcess thread exit";
+		//Trace << "acceptProcess thread exit";
 	}
 
 	void SocketServerInternal::connectionProcess() {
@@ -286,7 +286,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			SafeDelete(so);
 		}
 		
-		Trace << "connectionProcess thread exit, maxfd: " << maxfd;
+		//Trace << "connectionProcess thread exit, maxfd: " << maxfd;
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////

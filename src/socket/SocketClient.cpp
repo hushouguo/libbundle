@@ -73,7 +73,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			return false;
 		}
 				
-		Trace.cout("SocketClient establish with %s:%d", this->_address.c_str(), this->_port);	
+		//Trace.cout("SocketClient establish with %s:%d", this->_address.c_str(), this->_port);	
 		return this->_active = true;
 	}
 	
