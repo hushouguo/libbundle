@@ -20,7 +20,7 @@ BEGIN_NAMESPACE_BUNDLE {
 				/* -1 to block indefinitely, 0 to return immediately, even if no events are available. */
 				int numevents = ::epoll_wait(this->_epfd, this->_events, NM_POLL_EVENT, milliseconds);
 				if (numevents < 0) {
-					if (interrupted()) {
+					if (errno == EINTR) {
 						return; // wake up by signal
 					}
 					CHECK_RETURN(false, void(0), "epoll wait error:%d, %s", errno, strerror(errno));

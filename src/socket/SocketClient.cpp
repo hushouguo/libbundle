@@ -88,6 +88,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		this->_threadClient = new std::thread([this]() {
 			this->clientProcess();
 		});
+		std::this_thread::yield();
 		
 		return true;
 	}
@@ -95,7 +96,8 @@ BEGIN_NAMESPACE_BUNDLE {
 	void SocketClientInternal::clientProcess() {
 		struct sigaction act;
         act.sa_handler = [](int sig) {
-			Debug << "clientProcess receive signal: " << sig;
+			//Debug << "clientProcess receive signal: " << sig;
+			//fprintf(stderr, "clientProcess receive signal: %d\n", sig);
 		}; // sa_handler will not take effect if it is not set, different with connectSignal implement
         sigemptyset(&act.sa_mask);
         sigaddset(&act.sa_mask, SIGTERM);

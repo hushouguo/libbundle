@@ -30,10 +30,6 @@ BEGIN_NAMESPACE_BUNDLE {
 			bool setsockopt(int opt, const void* optval, size_t optlen) override;
 			bool getsockopt(int opt, void* optval, size_t optlen) override;
 
-		public:
-			void acceptProcess();
-			void connectionProcess(SlotConnection* slot);
-
 		private:
 			std::thread* _threadAccept = nullptr;
 			LockfreeQueue<Socketmessage> _readQueue;
@@ -53,6 +49,10 @@ BEGIN_NAMESPACE_BUNDLE {
 			void pushMessage(const Socketmessage* msg);
 
 			std::function<int(const Byte*, size_t)> _splitMessage = nullptr;
+
+		public:
+			void acceptProcess();
+			void connectionProcess(SlotConnection* slot);
 	};
 		
 	bool SocketServerInternal::start(const char* address, int port) {
@@ -83,8 +83,8 @@ BEGIN_NAMESPACE_BUNDLE {
 
 		for (auto& slot : this->_slotConnection) {
 			SafeDelete(slot.threadConnection);
-			slot.threadConnection = new std::thread([this]() {
-				this->connectionProcess();
+			slot.threadConnection = new std::thread([this](SlotConnection* slot) {
+				this->connectionProcess(slot);
 			}, &slot);
 		}
 				
@@ -101,7 +101,8 @@ BEGIN_NAMESPACE_BUNDLE {
 	void SocketServerInternal::acceptProcess() {
 		struct sigaction act;
         act.sa_handler = [](int sig) {
-			Debug << "acceptProcess receive signal: " << sig;
+			//Debug << "acceptProcess receive signal: " << sig;
+			//fprintf(stderr, "acceptProcess receive signal: %d\n", sig);
 		}; // sa_handler will not take effect if it is not set, different with connectSignal implement
         sigemptyset(&act.sa_mask);  
         sigaddset(&act.sa_mask, SIGTERM);
@@ -131,6 +132,9 @@ BEGIN_NAMESPACE_BUNDLE {
 			slot.fdslocker.lock();
 			slot.connfds.push_back(s);
 			slot.fdslocker.unlock();
+			if (slot.threadConnection) {
+				pthread_kill(slot.threadConnection->native_handle(), SIGALRM);
+			}
 		}
 		Debug << "acceptProcess thread exit";
 	}
@@ -138,7 +142,8 @@ BEGIN_NAMESPACE_BUNDLE {
 	void SocketServerInternal::connectionProcess(SlotConnection* slot) {
 		struct sigaction act;
         act.sa_handler = [](int sig) {
-			Debug << "connectionProcess receive signal: " << sig;
+			//Debug << "connectionProcess receive signal: " << sig;
+			//fprintf(stderr, "connectionProcess receive signal: %d\n", sig);
 		}; // sa_handler will not take effect if it is not set, different with connectSignal implement
         sigemptyset(&act.sa_mask);
         sigaddset(&act.sa_mask, SIGALRM);
@@ -383,6 +388,11 @@ BEGIN_NAMESPACE_BUNDLE {
 					bundle::releaseMessage(msg);
 				}
 
+				// close connection
+				for (auto s : slot.connfds) {
+					::close(s);
+				}
+
 				SafeDelete(slot.threadConnection);
 			}
 			
@@ -396,11 +406,6 @@ BEGIN_NAMESPACE_BUNDLE {
 				bundle::releaseMessage(msg);
 			}
 
-
-			// close connection
-			for (auto s : this->_connfds) {
-				::close(s);
-			}
 
 			// close listening port
 			if (this->_fd != BUNDLE_INVALID_SOCKET) {

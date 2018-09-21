@@ -74,7 +74,7 @@ void createClient(u32 msgsize) {
 	//t1.now();
 	gettimeofday(&t1, nullptr);
 
-	sleep(1);
+	//sleep(1);
 
 	struct timeval ta, tb, tc;
 	for (u32 i = 0; i < N; ++i) {
