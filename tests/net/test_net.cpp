@@ -9,7 +9,7 @@ using namespace bundle;
 
 //Time t1, t2;
 struct timeval t1, t2;
-u32 N = 1000;
+u32 N = 10;
 
 SocketServer* ss = nullptr;
 SocketClient* cs = nullptr;
@@ -93,7 +93,7 @@ void createClient(u32 msgsize) {
 	}
 }
 
-void test_net() {
+void test_net2() {
 //	Easylog::syslog()->set_level(LEVEL_DEBUG);
 	Easylog::syslog()->set_level(LEVEL_TRACE);
 
@@ -115,5 +115,42 @@ void test_net() {
 	}
 
 	System << "test net OK";
+}
+
+void test_net() {
+	ss = SocketServerCreator::create([=](const Byte* buffer, size_t len) -> int{
+			return len;
+			});
+	assert(ss);
+	ss->setWorkerNumber(4);
+	bool rc = ss->start("0.0.0.0", 12306);
+	assert(rc);
+
+	auto runnable = []() {
+		u32 n = 0;
+		while (n < N) {
+			SOCKET s = -1;
+			bool establish = false, close = false;
+			const Socketmessage* msg = ss->receiveMessage(s, establish, close);
+			if (msg) {
+				if (establish) {
+					//fprintf(stderr, "SocketServer: establish: %d\n", s);
+				}
+				else if (close) {
+					//fprintf(stderr, "SocketServer: lostConnection: %d\n", s);
+				}
+				else {
+					//fprintf(stderr, "receive Socketmessage: %d\n", n);
+					++n;
+				}
+				bundle::releaseMessage(msg);
+			}
+			else {
+				std::this_thread::sleep_for(std::chrono::milliseconds(1));	
+			}
+		}
+	};
+
+	runnable();
 }
 

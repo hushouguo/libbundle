@@ -73,8 +73,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 	bool SocketServerInternal::setWorkerNumber(u32 worker_number) {
 		CHECK_RETURN(this->_stop, false, "SockerServer is running, stop it at first!");
-		//CHECK_RETURN(worker_number > 0, false, "worker number must be greater than 0");
-		CHECK_RETURN(worker_number > std::thread::hardware_concurrency() * 8, false, 
+		CHECK_RETURN(worker_number < std::thread::hardware_concurrency() * 8, false, 
 		"woker number: %d too large, hardware: %d, suggest: %d", worker_number, std::thread::hardware_concurrency(), std::thread::hardware_concurrency() * 2);
 		this->_workerNumber = worker_number;
 		return true;
@@ -246,7 +245,7 @@ BEGIN_NAMESPACE_BUNDLE {
 				// throw close message
 				//
 				this->_readQueue.push_back(msg);
-				Debug << "lost connection: " << newfd << ", slot: " << slot->id;
+				Debug << "lost connection: " << s << ", slot: " << slot->id;
 			};
 
 			slot->broadcastMessage = [this](SlotProcess* slot, Socketmessage* msg) {
@@ -319,7 +318,7 @@ BEGIN_NAMESPACE_BUNDLE {
 							//
 							// silence time too long
 							//
-							slot->removeSocket(slot->s);
+							slot->removeSocket(slot, s);
 						}
 						else if (this->_opts[BUNDLE_SOL_THRESHOLD_MESSAGE] > 0 && this->_opts[BUNDLE_SOL_THRESHOLD_INTERVAL] > 0) {
 							u32 total = so->recentMessage(this->_opts[BUNDLE_SOL_THRESHOLD_INTERVAL]);
@@ -328,7 +327,7 @@ BEGIN_NAMESPACE_BUNDLE {
 								//
 								// send message too fast
 								//
-								slot->removeSocket(slot->s);
+								slot->removeSocket(slot, s);
 							}
 						}
 					}
