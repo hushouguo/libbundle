@@ -37,7 +37,8 @@ BEGIN_NAMESPACE_BUNDLE {
 			std::thread* _threadAccept = nullptr;
 			std::thread* _threadConnection = nullptr;
 			
-			std::mutex _fdslocker;
+			//std::mutex _fdslocker;
+			Spinlocker _fdslocker;
 			std::list<SOCKET> _connfds;
 
 			SOCKET _fd = BUNDLE_INVALID_SOCKET;
@@ -113,8 +114,10 @@ BEGIN_NAMESPACE_BUNDLE {
 				CHECK_RETURN(false, void(0), "accept error:%d,%s", errno, strerror(errno));
 			}
 
-			std::lock_guard<std::mutex> guard(this->_fdslocker);
+			//std::lock_guard<std::mutex> guard(this->_fdslocker);
+			this->_fdslocker.lock();
 			this->_connfds.push_back(s);
+			this->_fdslocker.unlock();
 		}
 		Debug << "acceptProcess thread exit";
 	}
@@ -230,7 +233,9 @@ BEGIN_NAMESPACE_BUNDLE {
 		while (!this->isstop()) {
 			checkConnection();
 			
-			while (!this->_connfds.empty() && this->_fdslocker.try_lock()) {
+			//while (!this->_connfds.empty() && this->_fdslocker.try_lock()) {
+			while (!this->_connfds.empty()) {
+				this->_fdslocker.lock();
 				SOCKET s = this->_connfds.front();
 				this->_connfds.pop_front();
 				this->_fdslocker.unlock();
