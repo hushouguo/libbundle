@@ -44,7 +44,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		ee.data.fd = s;
 		/* Note, Kernel < 2.6.9 requires a non null event pointer even for EPOLL_CTL_DEL. */
 		int rc = epoll_ctl(this->_epfd, EPOLL_CTL_MOD, s, &ee);
-		CHECK_RETURN(rc == 0, false, "epoll_mod error: %d, %s", errno, strerror(errno));
+		CHECK_RETURN(rc == 0, false, "epoll_mod error: %d, %s, socket: %d", errno, strerror(errno), s);
 		return true;
 	}
 }

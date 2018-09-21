@@ -14,13 +14,15 @@
 #include "lockfree/test_lockfree.h"
 
 int epfd = epoll_create(128);
-int main() {
+int main() {	
 	bundle::Easylog::syslog()->set_tostdout(bundle::GLOBAL, true);
 
-	auto addSocket = [](int s){
+#if 0
+	auto addSocket = [](int s, u32 events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLERR){
 		fprintf(stderr, "addSocket: %d\n", s);
 		struct epoll_event ee;
-		ee.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLERR;
+		//ee.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLERR;
+		ee.events = events;
 		ee.data.u64 = 0; /* avoid valgrind warning */
 		ee.data.fd = s;
 		epoll_ctl(epfd, EPOLL_CTL_ADD, s, &ee);
@@ -70,8 +72,13 @@ int main() {
 	sleep(1);
 	modifySocket(s, EPOLLET | EPOLLIN | EPOLLOUT | EPOLLERR);
 	sleep(1);
+	addSocket(0, EPOLLET | EPOLLOUT | EPOLLERR);
+	sleep(1);
+	addSocket(0, EPOLLET | EPOLLOUT | EPOLLERR);
+	sleep(1);
 
 	epoll_thread->join();
+#endif
 
 #if 0
 	struct sigaction act;
@@ -85,7 +92,7 @@ int main() {
 #endif
 
 	//test_tools();
-	//test_net();
+	test_net();
 	//test_csv("./csv/test.csv");
 	//test_xml("./xml/conf.xml");
 	//test_xml("../server/recordserver/conf/db.xml");

@@ -32,6 +32,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			void clientProcess();
 			
 		private:
+			Poll _poll;
 			std::thread* _threadClient = nullptr;
 			
 			SOCKET _fd = BUNDLE_INVALID_SOCKET;
@@ -93,7 +94,16 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	void SocketClientInternal::clientProcess() {
-		Poll poll;
+		struct sigaction act;
+        act.sa_handler = [](int sig) {
+			Debug << "clientProcess receive signal: " << sig;
+		}; // sa_handler will not take effect if it is not set, different with connectSignal implement
+        sigemptyset(&act.sa_mask);  
+        sigaddset(&act.sa_mask, SIGTERM);
+        act.sa_flags = SA_INTERRUPT; //The system call that is interrupted by this signal will not be restarted automatically
+        sigaction(SIGTERM, &act, nullptr);
+
+		//Poll poll;
 		Socket* so = nullptr;
 
 		auto getSocket = [&](SOCKET s) -> Socket* {
@@ -109,7 +119,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			if (!so || s != so->fd()) {
 				SafeDelete(so);// discard all unsent messages!
 				so = new Socket(s, this->_splitMessage);
-				poll.addSocket(s);
+				this->_poll.addSocket(s);
 				Socketmessage* msg = allocateMessage(s, SM_OPCODE_ESTABLISH);
 				pushMessage(msg);
 			}
@@ -118,7 +128,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		auto removeSocket = [&](SOCKET s) {
 			Socketmessage* msg = allocateMessage(s, SM_OPCODE_CLOSE);
 			pushMessage(msg);
-			poll.removeSocket(s);
+			this->_poll.removeSocket(s);
 			SafeDelete(so);
 			this->_active = false;
 		};
@@ -159,7 +169,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			}
 			else {
 				addSocket(this->fd());
-				if (this->_writeQueue.size() > 0) {
+				while (this->_writeQueue.size() > 0) {
 					const Socketmessage* msg = this->_writeQueue.pop_front();
 					assert(msg->magic == MAGIC);
 					if (!getSocket(msg->s)) {
@@ -168,8 +178,9 @@ BEGIN_NAMESPACE_BUNDLE {
 					else {
 						writeMessage(msg->s, msg);
 					}
-				}				
-				poll.run(-1, readSocket, writeSocket, removeSocket);
+				}
+				this->_poll.run(-1, readSocket, writeSocket, removeSocket);
+				//fprintf(stderr, "clientProcess wakeup\n");
 			}
 		}
 
@@ -207,17 +218,29 @@ BEGIN_NAMESPACE_BUNDLE {
 
 	void SocketClientInternal::pushMessage(const Socketmessage* msg) {
 		this->_writeQueue.push_back((Socketmessage*)msg);
-		//TODO: send signal to connectionProcess or wakeup epoll_wait
+		//this->_poll.setSocketPollout(this->fd(), true);// wakeup clientProcess in epoll_ctl
+		//static u32 __messages = 0;
+		if (this->_threadClient) {
+			//fprintf(stderr, "signal notify _threadClient: %d\n", ++__messages);
+			pthread_kill(this->_threadClient->native_handle(), SIGTERM);
+		}
+		else {
+			fprintf(stderr, "_threadClient is nullptr\n");
+		}
 	}
 		
 	void SocketClientInternal::stop() {
 		if (!this->isstop()) {
 			this->_stop = true;
-			if (this->_threadClient && this->_threadClient->joinable()) {
-				this->_threadClient->join();
+			if (this->_threadClient) {
+				//fprintf(stderr, "socketClient stop\n");
+				pthread_kill(this->_threadClient->native_handle(), SIGTERM);
+				if (this->_threadClient->joinable()) {
+					this->_threadClient->join();
+				}
 			}
 
-			// release rQueue messages
+			// release readQueue messages
 			for (;;) {
 				Socketmessage* msg = this->_readQueue.pop_front();
 				if (!msg) {
@@ -226,7 +249,7 @@ BEGIN_NAMESPACE_BUNDLE {
 				bundle::releaseMessage(msg);
 			}
 
-			// release wQueue messages
+			// release writeQueue messages
 			for (;;) {
 				Socketmessage* msg = this->_writeQueue.pop_front();
 				if (!msg) {

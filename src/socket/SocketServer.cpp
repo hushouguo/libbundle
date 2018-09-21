@@ -345,7 +345,7 @@ BEGIN_NAMESPACE_BUNDLE {
 				this->_threadConnection->join();
 			}
 
-			// release rQueue messages
+			// release readQueue messages
 			for (;;) {
 				Socketmessage* msg = this->_readQueue.pop_front();
 				if (!msg) {
@@ -354,7 +354,7 @@ BEGIN_NAMESPACE_BUNDLE {
 				bundle::releaseMessage(msg);
 			}
 
-			// release wQueue messages
+			// release writeQueue messages
 			for (;;) {
 				Socketmessage* msg = this->_writeQueue.pop_front();
 				if (!msg) {

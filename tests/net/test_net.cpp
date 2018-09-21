@@ -9,7 +9,7 @@ using namespace bundle;
 
 //Time t1, t2;
 struct timeval t1, t2;
-u32 N = 100;
+u32 N = 1000;
 
 SocketServer* ss = nullptr;
 SocketClient* cs = nullptr;
@@ -45,7 +45,7 @@ void createServer(u32 msgsize) {
 					//fprintf(stderr, "SocketServer: lostConnection: %d\n", s);
 				}
 				else {
-					//printf("receive rawmsg: %d from SOCKET: %d\n", rawmsg->payload_len, s);
+					//fprintf(stderr, "receive Socketmessage: %d\n", n);
 					++n;
 				}
 				bundle::releaseMessage(msg);
@@ -73,6 +73,8 @@ void createClient(u32 msgsize) {
 
 	//t1.now();
 	gettimeofday(&t1, nullptr);
+
+	sleep(1);
 
 	struct timeval ta, tb, tc;
 	for (u32 i = 0; i < N; ++i) {
