@@ -24,6 +24,7 @@ aux_source_directory(csv src)
 aux_source_directory(xml src)
 aux_source_directory(recordclient src)
 aux_source_directory(entity src)
+aux_source_directory(lockfree src)
 
 link_directories(/usr/lib64) 
 link_directories(/usr/lib64/mysql)

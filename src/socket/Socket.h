@@ -21,6 +21,7 @@ BEGIN_NAMESPACE_BUNDLE {
 				for (auto& msg : this->_sendlist) {
 					releaseMessage(msg);
 				}
+				this->_sendlist.clear();
 			}
 			
 		public:

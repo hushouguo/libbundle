@@ -279,7 +279,7 @@ BEGIN_NAMESPACE_BUNDLE {
 				}
 			}
 
-			poll.run(1, readSocket, writeSocket, removeSocket);
+			poll.run(-1, readSocket, writeSocket, removeSocket);
 		}
 		
 		for (auto& so : sockets) {
