@@ -208,11 +208,12 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 	
 	void SocketClientInternal::sendMessage(const Socketmessage* msg) {
+		((Socketmessage*)msg)->s = this->fd();
 		this->pushMessage(msg);
 	}
 
 	void SocketClientInternal::pushMessage(const Socketmessage* msg) {
-		this->_wQueue.push_back(msg);
+		this->_wQueue.push_back((Socketmessage*)msg);
 	}
 		
 	void SocketClientInternal::stop() {
@@ -222,13 +223,21 @@ BEGIN_NAMESPACE_BUNDLE {
 				this->_threadClient->join();
 			}
 
-			// release rlist messages
-			for (auto& msg : this->_rlist) {
+			// release rQueue messages
+			for (;;) {
+				Socketmessage* msg = this->_rQueue.pop_front();
+				if (!msg) {
+					break;
+				}
 				bundle::releaseMessage(msg);
 			}
 
-			// release wlist messages
-			for (auto& msg : this->_wlist) {
+			// release wQueue messages
+			for (;;) {
+				Socketmessage* msg = this->_wQueue.pop_front();
+				if (!msg) {
+					break;
+				}
 				bundle::releaseMessage(msg);
 			}
 

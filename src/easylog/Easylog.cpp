@@ -394,7 +394,16 @@ BEGIN_NAMESPACE_BUNDLE {
 				this->stop();
 				::abort();
 			}
-		}		
+		}
+		else {
+#if 0			
+			fprintf(stderr, "isstop: %s, easylogMessage->level: %d, this->level: %d, log: %s\n",
+					this->isstop() ? "true" : "false",
+					easylogMessage->level(),
+					this->level(),
+					easylogMessage->log()->buffer.str().c_str());
+#endif			
+		}
 	}
 
 #ifdef ENABLE_ASYNC_SEND
