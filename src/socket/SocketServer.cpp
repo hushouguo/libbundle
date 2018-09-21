@@ -113,6 +113,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		slot->threadWorker = new std::thread([this](SlotProcess* slot) {
 				this->workerProcess(slot);
 			}, slot);
+
 		slot->readSocket = [this](SlotProcess* slot, SOCKET s) {
 			assert(s == this->fd());
 			while (!this->isstop()) {
@@ -143,12 +144,17 @@ BEGIN_NAMESPACE_BUNDLE {
 				}
 			}
 		};
+
 		slot->removeSocket = [this](SlotProcess* slot, SOCKET s) {
 			assert(s == this->fd());
 			Error << "listen fd should not be removed!";
 		};
 		this->_slotProcesses.push_back(slot);
 
+		//
+		// add fd listening to poll
+		//
+		slot->poll.addSocket(this->fd());
 
 		// make worker process
 		for (u32 i = 0; i < this->_workerNumber; ++i) {

@@ -74,7 +74,7 @@ void createClient(u32 msgsize) {
 	//t1.now();
 	gettimeofday(&t1, nullptr);
 
-	//sleep(1);
+	sleep(1);
 
 	struct timeval ta, tb, tc;
 	for (u32 i = 0; i < N; ++i) {
@@ -94,7 +94,8 @@ void createClient(u32 msgsize) {
 }
 
 void test_net() {
-	Easylog::syslog()->set_level(LEVEL_DEBUG);
+//	Easylog::syslog()->set_level(LEVEL_DEBUG);
+	Easylog::syslog()->set_level(LEVEL_TRACE);
 
 	u32 sizes[] = {
 		4*KB, 8*KB, 16*KB, 32*KB, 64*KB, 128*KB, 256*KB, 512*KB, 
