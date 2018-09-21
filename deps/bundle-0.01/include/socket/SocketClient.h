@@ -7,7 +7,6 @@
 #define __SOCKET_CLIENT_H__
 
 BEGIN_NAMESPACE_BUNDLE {
-	class Socketmessage;
 	class SocketClient {
 		public:
 			virtual ~SocketClient() = 0;

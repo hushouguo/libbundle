@@ -71,8 +71,11 @@ BEGIN_NAMESPACE_BUNDLE {
 				}
 				else {
 					if (this->_msgParser) {
-						const Netmessage* netmsg = (Netmessage*)msg->payload;
-						assert(msg->payload_len == netmsg->len);
+						//const Netmessage* netmsg = (Netmessage*)msg->payload;
+						const Netmessage* netmsg = (const Netmessage *) messagePayload(msg);
+						size_t len = messagePayloadLength(msg);
+						//assert(msg->payload_len == netmsg->len);
+						assert(len == netmsg->len);
 						rc = this->_msgParser(this, netmsg);
 					}
 				}
@@ -88,10 +91,13 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	void NetworkClient::releaseMessage(const Netmessage* netmsg) {
+		//TODO:
+#if 0
 		Socketmessage* msg = (Socketmessage *) ((Byte*) netmsg - offsetof(Socketmessage, payload));
 		assert(msg->payload_len == netmsg->len);
 		assert(this->socketClient());
 		this->socketClient()->releaseMessage(msg);
+#endif		
 	}
 
 	void NetworkClient::stop() {

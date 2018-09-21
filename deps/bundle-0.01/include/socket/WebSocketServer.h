@@ -7,7 +7,6 @@
 #define __WEB_SOCKET_SERVER_H__
 
 BEGIN_NAMESPACE_BUNDLE {
-	class Socketmessage;
 	class WebSocketServer {
 		public:
 			virtual ~WebSocketServer() = 0;

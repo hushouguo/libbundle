@@ -13,7 +13,6 @@
 #define BUNDLE_SOL_MAX					128
 
 BEGIN_NAMESPACE_BUNDLE {
-	class Socketmessage;
 	class SocketServer {
 		public:
 			virtual ~SocketServer() = 0;

@@ -157,4 +157,59 @@ BEGIN_NAMESPACE_BUNDLE {
 
 		return true;
 	}
+
+	// Socketmessage
+	//
+	Socketmessage* allocateMessage(SOCKET s, u8 opcode) {
+		Socketmessage* msg = (Socketmessage*) ::malloc(sizeof(Socketmessage));
+		msg->magic = MAGIC;
+		msg->s = s;
+		msg->opcode = opcode;
+		msg->payload_len = 0;
+		return msg;
+	}
+
+	Socketmessage* allocateMessage(SOCKET s, u8 opcode, size_t payload_len) {
+		Socketmessage* msg = (Socketmessage*) ::malloc(sizeof(Socketmessage) + payload_len);
+		msg->magic = MAGIC;
+		msg->s = s;
+		msg->opcode = opcode;
+		msg->payload_len = payload_len;
+		return msg;
+	}
+
+	Socketmessage* allocateMessage(SOCKET s, u8 opcode, const void* payload, size_t payload_len) {
+		Socketmessage* msg = (Socketmessage*) ::malloc(sizeof(Socketmessage) + payload_len);
+		msg->magic = MAGIC;
+		msg->s = s;
+		msg->opcode = opcode;
+		msg->payload_len = payload_len;
+		if (payload) {
+			memcpy(msg->payload, payload, payload_len);
+		}
+		return msg;
+	}
+	
+	void releaseMessage(const Socketmessage* msg) {
+		assert(msg->magic == MAGIC);
+		SafeFree(msg);
+	}
+
+    Socketmessage* allocateMessage(size_t payload_len) {
+		return allocateMessage(BUNDLE_INVALID_SOCKET, SM_OPCODE_MESSAGE, payload_len);
+	}
+
+    Socketmessage* allocateMessage(size_t payload_len, const void* payload) {
+		return allocateMessage(BUNDLE_INVALID_SOCKET, SM_OPCODE_MESSAGE, payload, payload_len);
+	}
+
+    const void* messagePayload(const Socketmessage* msg) {
+		assert(msg);
+		return msg->payload;
+	}
+
+    size_t messagePayloadLength(const Socketmessage* msg) {
+		assert(msg);
+		return msg->payload_len;
+	}
 }

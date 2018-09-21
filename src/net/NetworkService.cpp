@@ -124,7 +124,8 @@ BEGIN_NAMESPACE_BUNDLE {
 				else {
 					NetworkTask* task = FindOrNull(this->_tasks, s);
 					if (task && this->_msgParser) {
-						rc = this->_msgParser(this, task, (const Netmessage *) msg->payload);
+						//TODO:
+						//rc = this->_msgParser(this, task, (const Netmessage *) msg->payload);
 					}
 				}
 				if (rc) {
@@ -139,10 +140,13 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	void NetworkService::releaseMessage(const Netmessage* netmsg) {
+		//TODO:
+#if 0		
 		Socketmessage* msg = (Socketmessage *) ((Byte*) netmsg - offsetof(Socketmessage, payload));
 		assert(msg->payload_len == netmsg->len);
 		assert(this->socketServer());
 		this->socketServer()->releaseMessage(msg);
+#endif		
 	}
 
 	void NetworkService::close(NetworkInterface* task) {
