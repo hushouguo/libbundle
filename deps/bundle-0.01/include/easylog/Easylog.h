@@ -76,24 +76,24 @@ BEGIN_NAMESPACE_BUNDLE {
 		}
 	
 #define CHECK_TRACE(RC, MESSAGE, ...)	\
-			if (!(RC)) {\
-				Trace.cout(MESSAGE, ##__VA_ARGS__);\
-			}
+		if (!(RC)) {\
+			Trace.cout(MESSAGE, ##__VA_ARGS__);\
+		}
 			
 #define CHECK_ALARM(RC, MESSAGE, ...)	\
-			if (!(RC)) {\
-				Alarm.cout(MESSAGE, ##__VA_ARGS__);\
-			}
+		if (!(RC)) {\
+			Alarm.cout(MESSAGE, ##__VA_ARGS__);\
+		}
 
 #define CHECK_ERROR(RC, MESSAGE, ...)	\
-			if (!(RC)) {\
-				Error.cout(MESSAGE, ##__VA_ARGS__);\
-			}
+		if (!(RC)) {\
+			Error.cout(MESSAGE, ##__VA_ARGS__);\
+		}
 
 #define CHECK_PANIC(RC, MESSAGE, ...)	\
-			if (!(RC)) {\
-				Panic.cout(MESSAGE, ##__VA_ARGS__);\
-			}
+		if (!(RC)) {\
+			Panic.cout(MESSAGE, ##__VA_ARGS__);\
+		}
 
 	
 	enum EasylogColor { 

@@ -29,3 +29,22 @@ $ cat ~/.gitconfig
 16.程序启动时记录编译时间，用户等信息
 17.研究棋牌, openai
 18. recordserver要支持设置key
+
+优化,网络，日志
+while 阻塞住，看看信号能不能激活
+
+add debug
+panic, abort
+内部信息都是debug
+rlist, wlist用Socketmessage串起来，不需要锁
+
+send and recv 分开来测试, 1kb, 1000000
+
+thread block, 在外部stop的时候发送信号过去
+
+封装zeromq来处理服务器内部之间通信，同时net重构成zeromq那样，作为网关
+net io thread可以多个
+Socketmessage做成无锁处理
+所有线程没有业务要处理时，阻塞在io上，或者阻塞在信号上
+
+日志网络传送使用zeromq
