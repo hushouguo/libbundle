@@ -13,8 +13,6 @@
 #include "entity/test_entity.h"
 #include "lockfree/test_lockfree.h"
 
-int SIG = SIGALRM;
-
 int main() {	
 	bundle::Easylog::syslog()->set_tostdout(bundle::GLOBAL, true);
 

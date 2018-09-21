@@ -211,7 +211,7 @@ BEGIN_NAMESPACE_BUNDLE {
 					so = slot->sockets[newfd] = new Socket(newfd, this->_splitMessage);
 					slot->poll.addSocket(so->fd());
 					++this->_totalConnections;
-					if (newfd > slot->maxfd) { maxfd = newfd; }
+					if (newfd > slot->maxfd) { slot->maxfd = newfd; }
 					Socketmessage* msg = allocateMessage(newfd, SM_OPCODE_ESTABLISH);
 					//
 					// throw establish message
@@ -257,15 +257,15 @@ BEGIN_NAMESPACE_BUNDLE {
 
 			slot->doMessage = [this](SlotProcess* slot) {
 				while (slot->writeQueue.size() > 0) {
-					const Socketmessage* msg = slot->writeQueue.pop_front();
+					Socketmessage* msg = slot->writeQueue.pop_front();
 					assert(msg);
 					assert(msg->magic == MAGIC);
 					if (msg->s == BUNDLE_BROADCAST_SOCKET) {
 						slot->broadcastMessage(slot, msg);
 					}
 					else {
-						ASSERT_SOCKET(s);
-						Socket* so = slot->sockets[s];
+						ASSERT_SOCKET(msg->s);
+						Socket* so = slot->sockets[msg->s];
 						
 						if (so == nullptr) {
 							//
@@ -299,9 +299,9 @@ BEGIN_NAMESPACE_BUNDLE {
 				while (!slot->fdslist.empty()) {
 					slot->fdslocker.lock();
 					SOCKET newfd = slot->fdslist.front();
-					slot->pop_front();
+					slot->fdslist.pop_front();
 					slot->fdslocker.unlock();
-					slot->addSocket(newfd);
+					slot->addSocket(slot, newfd);
 				}
 			};
 			
@@ -329,7 +329,22 @@ BEGIN_NAMESPACE_BUNDLE {
 				slot->doMessage(slot);
 			}
 			
-			slot->poll.run(-1, slot->readSocket, slot->writeSocket, slot->removeSocket);
+			slot->poll.run(-1, 
+					[slot](SOCKET s) {
+						if (slot->readSocket) {
+							slot->readSocket(slot, s);
+						}
+					},
+					[slot](SOCKET s) {
+						if (slot->writeSocket) {
+							slot->writeSocket(slot, s);
+						}
+					},
+					[slot](SOCKET s) {
+						if (slot->removeSocket) {
+							slot->removeSocket(slot, s);
+						}
+					});
 		}
 		
 		Debug << "workerProcess thread exit, maxfd: " << slot->maxfd << ", writeQueue: " << slot->writeQueue.size() << ", fdslist: " << slot->fdslist.size();
@@ -384,7 +399,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	SocketServerInternal::SlotProcess* SocketServerInternal::getWorkerProcess(SOCKET s) {
 		assert(this->_slotProcesses.empty() == false);
 		return this->_slotProcesses.size() == 1 ? this->_slotProcesses[0] 
-					: this->_workerProcesses[(s % (this->_workerProcesses.size() - 1)) + 1];
+					: this->_slotProcesses[(s % (this->_slotProcesses.size() - 1)) + 1];
 	}
 
 	void SocketServerInternal::releaseProcess() {

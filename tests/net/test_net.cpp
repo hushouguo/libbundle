@@ -94,7 +94,7 @@ void createClient(u32 msgsize) {
 }
 
 void test_net() {
-	Easylog::syslog()->set_level(LEVEL_TRACE);
+	Easylog::syslog()->set_level(LEVEL_DEBUG);
 
 	u32 sizes[] = {
 		4*KB, 8*KB, 16*KB, 32*KB, 64*KB, 128*KB, 256*KB, 512*KB, 

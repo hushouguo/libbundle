@@ -29,27 +29,19 @@ BEGIN_NAMESPACE_BUNDLE {
 					struct epoll_event* ee = &this->_events[i];
 					if (ee->events & (EPOLLERR | EPOLLHUP)) {
 						Error.cout("fd: %d poll error or hup: %d", ee->data.fd, ee->events);
-						if (errorHandler != nullptr) {
-							errorHandler(ee->data.fd);
-						}
+						errorHandler(ee->data.fd);
 					}
 					else if (ee->events & EPOLLRDHUP) {
 						Error.cout("fd: %d poll error or rdhup: %d", ee->data.fd, ee->events);
-						if (errorHandler != nullptr) {
-							errorHandler(ee->data.fd);
-						}
+						errorHandler(ee->data.fd);
 					}
 					else {
 						if (ee->events & EPOLLIN) {
-							if (readHandler != nullptr) {
-								readHandler(ee->data.fd);
-							}
+							readHandler(ee->data.fd);
 						}
-						
+
 						if (ee->events & EPOLLOUT) {
-							if (writeHandler != nullptr) {
-								writeHandler(ee->data.fd);
-							}
+							writeHandler(ee->data.fd);
 						}
 					}
 				}			
