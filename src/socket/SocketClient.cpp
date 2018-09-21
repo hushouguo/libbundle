@@ -41,10 +41,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			std::string _address;
 			int _port = 0;
 			
-			//std::mutex _rlocker, _wlocker;
-			//std::list<const Socketmessage *> _rlist;
-			//std::list<const Socketmessage *> _wlist;
-			LockfreeQueue<Socketmessage> _rQueue, _wQueue; 
+			LockfreeQueue<Socketmessage> _readQueue, _writeQueue; 
 
 			bool connectServer();
 			void pushMessage(const Socketmessage* msg);
@@ -105,7 +102,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		};
 
 		auto pushMessage = [&](Socketmessage* msg) {
-			this->_rQueue.push_back(msg);
+			this->_readQueue.push_back(msg);
 		};
 
 		auto addSocket = [&](SOCKET s) {
@@ -163,9 +160,9 @@ BEGIN_NAMESPACE_BUNDLE {
 			else {
 				addSocket(this->fd());
 				//while (!this->_wlist.empty() && this->active() && this->_wlocker.try_lock()) {
-				if (this->_wQueue.size() > 0) {
+				if (this->_writeQueue.size() > 0) {
 					//const Socketmessage* msg = this->_wlist.front();
-					const Socketmessage* msg = this->_wQueue.pop_front();
+					const Socketmessage* msg = this->_writeQueue.pop_front();
 					//this->_wlist.pop_front();
 					//this->_wlocker.unlock();
 					assert(msg->magic == MAGIC);
@@ -187,7 +184,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	
 	const Socketmessage* SocketClientInternal::receiveMessage(bool& establish, bool& close) {
 		establish = close = false;
-		const Socketmessage* msg = this->_rQueue.pop_front();
+		const Socketmessage* msg = this->_readQueue.pop_front();
 		if (msg) {
 			assert(msg->magic == MAGIC);
 			switch (msg->opcode) {
@@ -213,7 +210,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	void SocketClientInternal::pushMessage(const Socketmessage* msg) {
-		this->_wQueue.push_back((Socketmessage*)msg);
+		this->_writeQueue.push_back((Socketmessage*)msg);
 	}
 		
 	void SocketClientInternal::stop() {
@@ -225,7 +222,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 			// release rQueue messages
 			for (;;) {
-				Socketmessage* msg = this->_rQueue.pop_front();
+				Socketmessage* msg = this->_readQueue.pop_front();
 				if (!msg) {
 					break;
 				}
@@ -234,7 +231,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 			// release wQueue messages
 			for (;;) {
-				Socketmessage* msg = this->_wQueue.pop_front();
+				Socketmessage* msg = this->_writeQueue.pop_front();
 				if (!msg) {
 					break;
 				}

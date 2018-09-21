@@ -37,7 +37,6 @@ BEGIN_NAMESPACE_BUNDLE {
 			std::thread* _threadAccept = nullptr;
 			std::thread* _threadConnection = nullptr;
 			
-			//std::mutex _fdslocker;
 			Spinlocker _fdslocker;
 			std::list<SOCKET> _connfds;
 
@@ -45,7 +44,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			bool _stop = true;
 			size_t _opts[BUNDLE_SOL_MAX], _size = 0;
 			
-			LockfreeQueue<Socketmessage> _rQueue, _wQueue;
+			LockfreeQueue<Socketmessage> _readQueue, _writeQueue;
 			void pushMessage(const Socketmessage* msg);
 
 			std::function<int(const Byte*, size_t)> _splitMessage = nullptr;
@@ -147,7 +146,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		};
 
 		auto pushMessage = [&](Socketmessage* msg) {
-			this->_rQueue.push_back(msg);
+			this->_readQueue.push_back(msg);
 		};
 		
 		auto addSocket = [&](SOCKET s) {
@@ -252,8 +251,8 @@ BEGIN_NAMESPACE_BUNDLE {
 				addSocket(s);
 			}
 
-			while (this->_wQueue.size() > 0) {
-				const Socketmessage* msg = this->_wQueue.pop_front();
+			while (this->_writeQueue.size() > 0) {
+				const Socketmessage* msg = this->_writeQueue.pop_front();
 				assert(msg);
 				assert(msg->magic == MAGIC);
 				if (msg->s == BUNDLE_BROADCAST_SOCKET) {
@@ -304,7 +303,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	const Socketmessage* SocketServerInternal::receiveMessage(SOCKET& s, bool& establish, bool& close) {
 		s = BUNDLE_INVALID_SOCKET;
 		establish = close = false;
-		const Socketmessage* msg = this->_rQueue.pop_front();
+		const Socketmessage* msg = this->_readQueue.pop_front();
 		if (msg) {
 			assert(msg->magic == MAGIC);
 			assert(msg->s != BUNDLE_INVALID_SOCKET);
@@ -337,7 +336,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	void SocketServerInternal::pushMessage(const Socketmessage* msg) {
-		this->_wQueue.push_back((Socketmessage*)msg);
+		this->_writeQueue.push_back((Socketmessage*)msg);
 	}
 	
 	void SocketServerInternal::stop() {
@@ -356,7 +355,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 			// release rQueue messages
 			for (;;) {
-				Socketmessage* msg = this->_rQueue.pop_front();
+				Socketmessage* msg = this->_readQueue.pop_front();
 				if (!msg) {
 					break;
 				}
@@ -365,7 +364,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 			// release wQueue messages
 			for (;;) {
-				Socketmessage* msg = this->_wQueue.pop_front();
+				Socketmessage* msg = this->_writeQueue.pop_front();
 				if (!msg) {
 					break;
 				}
