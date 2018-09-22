@@ -30,7 +30,6 @@ BEGIN_NAMESPACE_BUNDLE {
 
 #pragma pack(push, 1)
 	struct Socketmessage {
-		Socketmessage* next;
 		u32 magic;
 		SOCKET s;
 		u8 opcode;

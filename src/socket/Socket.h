@@ -25,7 +25,9 @@ BEGIN_NAMESPACE_BUNDLE {
 			}
 			
 		public:
-			inline SOCKET fd() { return this->_fd; }			
+			inline SOCKET fd() { return this->_fd; }
+			inline bool is_listening() { return this->_is_listening; }
+			inline void set_listening(bool value) { this->_is_listening = value; }
 			void close();
 			inline u64 lastSecond() { return this->_lastSecond; }
 			inline u32 totalMessage() { return this->_totalMessage; }
@@ -38,6 +40,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			
 		private:
 			SOCKET _fd = BUNDLE_INVALID_SOCKET;
+			bool _is_listening = false;
 			ByteBuffer _rbuffer, _wbuffer;
 			std::list<const Socketmessage*> _sendlist;
 			std::function<int(const Byte*, size_t)> _splitMessage = nullptr;
