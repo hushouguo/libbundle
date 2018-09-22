@@ -58,7 +58,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	void WorkerProcess::run() {
-		setSignal(WAKE_WORKER_PROCESS_SIGNAL);
+		//setSignal(WAKE_WORKER_PROCESS_SIGNAL);
 		while (!this->isstop()) {
 			this->checkSocket();
 			this->handleMessage();

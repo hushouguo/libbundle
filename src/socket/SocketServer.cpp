@@ -87,7 +87,6 @@ BEGIN_NAMESPACE_BUNDLE {
 
 		// create master process
 		WorkerProcess* master = new WorkerProcess(0, this->_splitMessage, &this->_readQueue);
-		sleep(1);
 		master->addSocket(this->_fd_listening, true);
 		this->_processes.push_back(master);
 

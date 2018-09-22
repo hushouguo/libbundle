@@ -13,8 +13,9 @@
 #include "entity/test_entity.h"
 #include "lockfree/test_lockfree.h"
 
-
 int main() {	
+	bundle::setSignal(SIGRTMIN);
+
 	bundle::Easylog::syslog()->set_tostdout(bundle::GLOBAL, true);
 
 	//test_tools();
