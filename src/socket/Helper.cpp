@@ -162,7 +162,6 @@ BEGIN_NAMESPACE_BUNDLE {
 	//
 	Socketmessage* allocateMessage(SOCKET s, u8 opcode) {
 		Socketmessage* msg = (Socketmessage*) ::malloc(sizeof(Socketmessage));
-		msg->next = nullptr;
 		msg->magic = MAGIC;
 		msg->s = s;
 		msg->opcode = opcode;
@@ -172,7 +171,6 @@ BEGIN_NAMESPACE_BUNDLE {
 
 	Socketmessage* allocateMessage(SOCKET s, u8 opcode, size_t payload_len) {
 		Socketmessage* msg = (Socketmessage*) ::malloc(sizeof(Socketmessage) + payload_len);
-		msg->next = nullptr;
 		msg->magic = MAGIC;
 		msg->s = s;
 		msg->opcode = opcode;
@@ -182,7 +180,6 @@ BEGIN_NAMESPACE_BUNDLE {
 
 	Socketmessage* allocateMessage(SOCKET s, u8 opcode, const void* payload, size_t payload_len) {
 		Socketmessage* msg = (Socketmessage*) ::malloc(sizeof(Socketmessage) + payload_len);
-		msg->next = nullptr;
 		msg->magic = MAGIC;
 		msg->s = s;
 		msg->opcode = opcode;

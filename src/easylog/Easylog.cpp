@@ -306,7 +306,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 		private:
 #ifdef ENABLE_ASYNC_SEND		
-			LockfreeQueue<EasylogNode> _logQueue;
+			LockfreeQueue<EasylogNode*> _logQueue;
 			std::mutex _logMutex;
 			std::condition_variable _logCondition;
 			std::thread* _logthread = nullptr;
@@ -409,7 +409,10 @@ BEGIN_NAMESPACE_BUNDLE {
 #ifdef ENABLE_ASYNC_SEND
 	void EasylogInternal::logProcess() {
 		while (true) {
-			EasylogNode* logNode = this->_logQueue.pop_front();
+			EasylogNode* logNode = nullptr;
+			if (!this->_logQueue.empty()) {
+				logNode = this->_logQueue.pop_front();
+			}
 			if (logNode) {
 				const std::string& s = logNode->buffer.str();
 				this->send_to_stdout(logNode->levelNode, s);

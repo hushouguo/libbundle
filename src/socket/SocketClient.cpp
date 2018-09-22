@@ -7,6 +7,7 @@
 #include "Helper.h"
 #include "Socket.h"
 #include "Poll.h"
+#include "WorkerProcess.h"
 
 #define CONNECT_TIMEOUT		10
 #define CONNECT_INTERVAL	5
@@ -31,7 +32,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 		private:
 			WorkerProcess* _slotWorker = nullptr;
-			LockfreeQueue<Socketmessage> _readQueue; 
+			LockfreeQueue<Socketmessage*> _readQueue; 
 			
 			SOCKET _fd = BUNDLE_INVALID_SOCKET;
 			bool _stop = true, _active = false;
@@ -125,7 +126,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	const Socketmessage* SocketClientInternal::receiveMessage(bool& establish, bool& close) {
 		establish = close = false;
 		while (!this->_readQueue.empty()) {
-			const Socketmessage* msg = this->_readQueue.pop_front();
+			Socketmessage* msg = this->_readQueue.pop_front();
 			assert(msg);
 			assert(msg->magic == MAGIC);
 			assert(msg->s != BUNDLE_INVALID_SOCKET);
@@ -147,7 +148,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 	
 	void SocketClientInternal::sendMessage(const Socketmessage* msg) {
-		this->_slotWorker->pushMessage(this->fd(), msg);
+		this->_slotWorker->pushMessage(this->fd(), (Socketmessage*) msg);
 	}
 
 	void SocketClientInternal::stop() {

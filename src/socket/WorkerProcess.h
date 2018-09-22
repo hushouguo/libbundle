@@ -27,6 +27,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		public:
 			WorkerProcess(u32 id, MESSAGE_SPLITER splitMessage, LockfreeQueue<Socketmessage*>* recvQueue);
 			~WorkerProcess();
+			const char* getClassName() override { return "WorkerProcess"; }
 
 		private:
 			Poll _poll;
@@ -47,7 +48,6 @@ BEGIN_NAMESPACE_BUNDLE {
 			void sendMessage(SOCKET, Socketmessage*);
 			void multisendMessage(Socketmessage*);
 			void checkSocket();
-			void acceptSocket();
 			void handleMessage();
 			void acceptSocket(Socket*);
 			void readSocket(Socket*);

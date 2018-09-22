@@ -16,7 +16,7 @@ SocketClient* cs = nullptr;
 std::thread* loop = nullptr;
 
 void createServer(u32 msgsize) {
-	ss = SocketServerCreator::create([=](const Byte* buffer, size_t len) -> int{
+	ss = SocketServerCreator::create([=](const void* buffer, size_t len) -> int{
 			if (len >= msgsize) {
 #if 0			
 				gettimeofday(&t2, nullptr);
@@ -64,7 +64,7 @@ void createServer(u32 msgsize) {
 }
 
 void createClient(u32 msgsize) {
-	cs = SocketClientCreator::create([=](const Byte* buffer, size_t len) -> int{
+	cs = SocketClientCreator::create([=](const void* buffer, size_t len) -> int{
 			return len >= msgsize ? msgsize : 0;
 			});
 	assert(cs);
@@ -118,7 +118,7 @@ void test_net2() {
 }
 
 void test_net() {
-	ss = SocketServerCreator::create([=](const Byte* buffer, size_t len) -> int{
+	ss = SocketServerCreator::create([=](const void* buffer, size_t len) -> int{
 			return len;
 			});
 	assert(ss);

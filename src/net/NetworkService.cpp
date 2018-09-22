@@ -59,7 +59,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 	bool NetworkService::start(const char* address, int port) {
 		SafeDelete(this->_socketServer);
-		this->_socketServer = SocketServerCreator::create([](const Byte* buffer, size_t len) -> int {
+		this->_socketServer = SocketServerCreator::create([](const void* buffer, size_t len) -> int {
 				Netmessage* netmsg = (Netmessage*) buffer;
 				return len < sizeof(Netmessage) || len < netmsg->len ? 0 : netmsg->len;
 				});

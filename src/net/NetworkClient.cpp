@@ -37,7 +37,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 	bool NetworkClient::connect(const char* address, int port) {
 		SafeDelete(this->_socketClient);
-		this->_socketClient = SocketClientCreator::create([](const Byte* buffer, size_t len) -> int {
+		this->_socketClient = SocketClientCreator::create([](const void* buffer, size_t len) -> int {
 				Netmessage* netmsg = (Netmessage*) buffer;
 				return len < sizeof(Netmessage) || len < netmsg->len ? 0 : netmsg->len;
 				});

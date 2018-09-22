@@ -394,7 +394,8 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	WebSocketServerInternal::WebSocketServerInternal() {
-		this->_socketServer = SocketServerCreator::create([this](const Byte* buffer, size_t len) -> int {
+		this->_socketServer = SocketServerCreator::create([this](const void* data, size_t len) -> int {
+			const Byte* buffer = (const Byte*) data;
 			if (len >= 3 && buffer[0] == 'G' && buffer[1] == 'E' && buffer[2] == 'T') {	// GET
 				std::string Sec_WebSocket_Key;
 				return this->parse_handshake_request(buffer, len, Sec_WebSocket_Key);

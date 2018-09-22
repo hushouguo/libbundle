@@ -3,6 +3,12 @@
  * \brief: Created by hushouguo at 05:42:03 Sep 22 2018
  */
 
+#include "bundle.h"
+#include "Helper.h"
+#include "Socket.h"
+#include "Poll.h"
+#include "WorkerProcess.h"
+
 #define GET_SOCKET(S) ({ ASSERT_SOCKET(S); this->_sockets[S]; })
 
 BEGIN_NAMESPACE_BUNDLE {
@@ -55,9 +61,9 @@ BEGIN_NAMESPACE_BUNDLE {
 		setSignal(WAKE_WORKER_PROCESS_SIGNAL);
 		while (!this->isstop()) {
 			this->checkSocket();
-			this->acceptSocket();
 			this->handleMessage();
-			this->poll.run(-1, this->readSocket, this->writeSocket, this->errorSocket);
+			this->_poll.run(-1, [this](SOCKET s) { this->readSocket(s); }, 
+					[this](SOCKET s) { this->writeSocket(s); }, [this](SOCKET s) { this->errorSocket(s); });
 		}
 		Debug << "WorkerProcess: " << this->id << " thread exit, maxfd: " << this->_maxfd 
 			<< ", recvQueue: " << this->_recvQueue->size() << ", sendQueue: " << this->_sendQueue.size();
@@ -125,7 +131,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			// get newfd from Socket
 			//
 			Socketmessage* msg = allocateMessage(newfd, SM_OPCODE_NEW_SOCKET);
-			this->_recvQueue.push_back(msg);
+			this->_recvQueue->push_back(msg);
 		}
 	}
 
@@ -145,7 +151,8 @@ BEGIN_NAMESPACE_BUNDLE {
 				//
 				// get newmsg from Socket
 				//
-				this->_recvQueue.push_back(newmsg);
+				this->_recvQueue->push_back(newmsg);
+				Debug << "slot: " << this->id << ", newmsg";
 			}
 			else {
 				return; }
@@ -199,7 +206,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		//
 		// throw close message
 		//
-		this->_recvQueue.push_back(msg);
+		this->_recvQueue->push_back(msg);
 		assert(_totalConnections > 0);
 		--_totalConnections;
 		Debug << "lost connection: " << s << ", worker: " << this->id << ", reason: " << reason;
@@ -233,16 +240,6 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	void WorkerProcess::checkSocket() {
-	}
-
-	void WorkerProcess::acceptSocket() {
-		while (!this->_fdsQueue.empty()) {
-			SOCKET newfd = this->_fdsQueue.pop_front();
-			ASSERT_SOCKET(newfd);
-			Socket* so = new Socket(newfd, this->_splitMessage);//TODO:
-			so->set_listening(false);
-			this->addSocket(so, true);
-		}
 	}
 
 	void WorkerProcess::handleMessage() {

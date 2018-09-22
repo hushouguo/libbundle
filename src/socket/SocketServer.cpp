@@ -35,7 +35,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 		private:
 			u32 _workerNumber = std::thread::hardware_concurrency();
-			LockfreeQueue<Socketmessage> _readQueue;
+			LockfreeQueue<Socketmessage*> _readQueue;
 			std::vector<WorkerProcess*> _processes;
 			WorkerProcess* getWorkerProcess(SOCKET);
 
@@ -87,6 +87,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 		// create master process
 		WorkerProcess* master = new WorkerProcess(0, this->_splitMessage, &this->_readQueue);
+		sleep(1);
 		master->addSocket(this->_fd_listening, true);
 		this->_processes.push_back(master);
 
@@ -101,7 +102,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		return true;
 	}
 
-	SocketServerInternal::WorkerProcess* SocketServerInternal::getWorkerProcess(SOCKET s) {
+	WorkerProcess* SocketServerInternal::getWorkerProcess(SOCKET s) {
 		assert(this->_processes.empty() == false);
 		return this->_processes.size() == 1 ? this->_processes[0] 
 					: this->_processes[(s % (this->_processes.size() - 1)) + 1];
@@ -115,7 +116,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		s = BUNDLE_INVALID_SOCKET;
 		establish = close = false;
 		while (!this->_readQueue.empty()) {
-			const Socketmessage* msg = this->_readQueue.pop_front();
+			Socketmessage* msg = this->_readQueue.pop_front();
 			assert(msg);
 			assert(msg->magic == MAGIC);
 			assert(msg->s != BUNDLE_INVALID_SOCKET);
@@ -152,7 +153,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	void SocketServerInternal::sendMessage(SOCKET s, const Socketmessage* msg) {
 		assert(s != BUNDLE_INVALID_SOCKET);
 		WorkerProcess* slot = this->getWorkerProcess(s);
-		slot->pushMessage(s, msg);
+		slot->pushMessage(s, (Socketmessage*) msg);
 	}
 
 	void SocketServerInternal::stop() {

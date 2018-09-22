@@ -13,7 +13,7 @@ struct Node {
 	Node(int value) : id(value), next(nullptr) {}
 };
 
-LockfreeQueue<Node> Q;
+LockfreeQueue<Node*> Q;
 
 void test_lockfree() {
 	auto producter = [](u32 size) {
