@@ -27,7 +27,7 @@
 
 //
 // benchmark:
-//	1 million EasyMessage object constrctor and ostringstream waste: 546 ms
+//	1 million EasylogMessage object constrctor and ostringstream waste: 546 ms
 //	1 million log_message but don't write to file and stdout waste: 1173 ms
 //	1 million log_message and write to file stream and not flush, not stdout, waste: 1231 ms
 //	1 million log_message to file and flush right now, waste: 2397 ms
@@ -43,7 +43,7 @@ BEGIN_NAMESPACE_BUNDLE {
 //
 #define ENABLE_ASYNC_SEND					1
 #define ENABLE_PREFIX_DATETIME				1
-//#define ENABLE_PREFIX_DATETIME_LONG			1
+//#define ENABLE_PREFIX_DATETIME_LONG		1
 #define ENABLE_PREFIX_DATETIME_MILLISECOND	1
 #define ENABLE_PREFIX_LEVEL					1
 #define ENABLE_PREFIX_ERROR_FILE			1
@@ -76,7 +76,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	struct LayoutNode {
 		std::string plainstring;
 		int arg = -1;
-		std::function<void(LayoutNode*, EasyMessage*, std::ostream&)> dynamicstring = nullptr;
+		std::function<void(LayoutNode*, EasylogMessage*, std::ostream&)> dynamicstring = nullptr;
 		LayoutNode(const char* s) : plainstring(s) {}
 		LayoutNode(const char* s, size_t n) : plainstring(s, n) {}
 		LayoutNode(std::string s) : plainstring(s) {}
@@ -85,11 +85,34 @@ BEGIN_NAMESPACE_BUNDLE {
 			this->arg = layoutNode->arg;
 			this->dynamicstring = layoutNode->dynamicstring;
 		}
-		LayoutNode(std::function<void(LayoutNode*, EasyMessage*, std::ostream&)> func) : dynamicstring(func) {}
+		LayoutNode(std::function<void(LayoutNode*, EasylogMessage*, std::ostream&)> func) : dynamicstring(func) {}
 	};
 #endif
 
-	EasyMessage::EasyMessage(Easylog* easylog, EasylogSeverityLevel level, std::string file, int line, std::string func)
+	// nodes at different levels
+	struct LevelNode {
+		EasylogSeverityLevel level;
+		EasylogColor color;
+		bool to_stdout;
+		std::string filename;
+		std::ofstream* fs;
+		u64 fs_launchtime;
+#ifdef HAS_LOG_LAYOUT				
+		std::list<LayoutNode*> layouts_prefix;
+		std::list<LayoutNode*> layouts_postfix;
+#endif				
+	};
+
+	// each log has a node
+	struct EasylogNode {
+		LevelNode* levelNode;
+		std::stringbuf buffer;
+		EasylogNode* next;
+		EasylogNode() : levelNode(nullptr), next(nullptr) {}
+	};
+
+
+	EasylogMessage::EasylogMessage(Easylog* easylog, EasylogSeverityLevel level, std::string file, int line, std::string func)
 		: std::ostream(nullptr)
 		, _easylog(easylog)
 		, _level(level)
@@ -97,10 +120,10 @@ BEGIN_NAMESPACE_BUNDLE {
 		, _file(file)
 		, _line(line)
 		, _function(func)
-#endif		
-		, _buffer(new std::stringbuf())
+#endif
+		, _log(new EasylogNode())
 	{
-		rdbuf(this->_buffer);
+		rdbuf(&this->_log->buffer);
 
 #ifdef HAS_LOG_LAYOUT
 		const std::list<LayoutNode*>& layouts = this->_easylog->layout_prefix(this->level());
@@ -152,7 +175,7 @@ BEGIN_NAMESPACE_BUNDLE {
 #endif
 	}
 
-	EasyMessage::~EasyMessage() {
+	EasylogMessage::~EasylogMessage() {
 #ifdef HAS_LOG_LAYOUT
 		const std::list<LayoutNode*>& layouts = this->_easylog->layout_postfix(this->level());
 		for (auto& layoutNode : layouts) {
@@ -167,14 +190,14 @@ BEGIN_NAMESPACE_BUNDLE {
 		this->flush();
 	}
 
-	void EasyMessage::flush() {
+	void EasylogMessage::flush() {
 		if (this->tellp() > 0) {
 			*this << "\n";
 			this->_easylog->log_message(this);
 		}
 	}
 
-	void EasyMessage::cout(const char* format, ...) {
+	void EasylogMessage::cout(const char* format, ...) {
 		char log[65536];
 		va_list va;
 		va_start(va, format);
@@ -217,7 +240,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			void stop() override;
 
 		public:
-			void log_message(EasyMessage* easyMessage) override;
+			void log_message(EasylogMessage* easylogMessage) override;
 
 		private:
 			bool _stop = false;
@@ -227,18 +250,6 @@ BEGIN_NAMESPACE_BUNDLE {
 			void full_filename(const std::string& filename, std::string& fullname);
 
 		private:
-			struct LevelNode {
-				EasylogSeverityLevel level;
-				EasylogColor color;
-				bool to_stdout;
-				std::string filename;
-				std::ofstream* fs;
-				u64 fs_launchtime;
-#ifdef HAS_LOG_LAYOUT				
-				std::list<LayoutNode*> layouts_prefix;
-				std::list<LayoutNode*> layouts_postfix;
-#endif				
-			};
 
 			void openfile(LevelNode* levelNode);
 			void autosplit_file(LevelNode* levelNode);
@@ -284,14 +295,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 		private:
 #ifdef ENABLE_ASYNC_SEND		
-			struct LogNode {
-				LevelNode* levelNode;
-				std::stringbuf* log;
-				struct LogNode* next;
-				LogNode() : levelNode(nullptr), log(nullptr), next(nullptr) {}
-				LogNode(LevelNode* _levelNode, std::stringbuf* _log) : levelNode(_levelNode), log(_log), next(nullptr) {}
-			};
-			LockfreeQueue<LogNode> _logQueue;
+			LockfreeQueue<EasylogNode> _logQueue;
 			std::mutex _logMutex;
 			std::condition_variable _logCondition;
 			std::thread* _logthread = nullptr;
@@ -303,30 +307,30 @@ BEGIN_NAMESPACE_BUNDLE {
 			std::unordered_map<std::string, LayoutNode*> _initnodes = {
 				{ "process", new LayoutNode(std::to_string(getpid())) },
 				{ "thread", new LayoutNode(std::to_string((threadid()))) },
-				{ "level", new LayoutNode([this](LayoutNode* layoutNode, EasyMessage* easyMessage, std::ostream& os) {
-					os << level_string(easyMessage->level());
+				{ "level", new LayoutNode([this](LayoutNode* layoutNode, EasylogMessage* easylogMessage, std::ostream& os) {
+					os << level_string(easylogMessage->level());
 				}) },
-				{ "levelshort", new LayoutNode([this](LayoutNode* layoutNode, EasyMessage* easyMessage, std::ostream& os) {
-					os << levelshort_string(easyMessage->level());
+				{ "levelshort", new LayoutNode([this](LayoutNode* layoutNode, EasylogMessage* easylogMessage, std::ostream& os) {
+					os << levelshort_string(easylogMessage->level());
 				}) },
 				{ "user", new LayoutNode(getlogin()) },
 				{ "host", new LayoutNode(gethostname()) },
-				{ "file", new LayoutNode([](LayoutNode* layoutNode, EasyMessage* easyMessage, std::ostream& os) {
-					os << easyMessage->file();
+				{ "file", new LayoutNode([](LayoutNode* layoutNode, EasylogMessage* easylogMessage, std::ostream& os) {
+					os << easylogMessage->file();
 				}) },
-				{ "line", new LayoutNode([](LayoutNode* layoutNode, EasyMessage* easyMessage, std::ostream& os) {
-					os << easyMessage->line();
+				{ "line", new LayoutNode([](LayoutNode* layoutNode, EasylogMessage* easylogMessage, std::ostream& os) {
+					os << easylogMessage->line();
 				}) },
-				{ "function", new LayoutNode([](LayoutNode* layoutNode, EasyMessage* easyMessage, std::ostream& os) {
-					os << easyMessage->function();
+				{ "function", new LayoutNode([](LayoutNode* layoutNode, EasylogMessage* easylogMessage, std::ostream& os) {
+					os << easylogMessage->function();
 				}) },
 				{ "msg", nullptr},
-				{ "datetime", new LayoutNode([](LayoutNode* layoutNode, EasyMessage* easyMessage, std::ostream& os) {
+				{ "datetime", new LayoutNode([](LayoutNode* layoutNode, EasylogMessage* easylogMessage, std::ostream& os) {
 					char time_buffer[64];
 					timestamp(time_buffer, sizeof(time_buffer), sTime.secondPart(), layoutNode->plainstring.c_str());
 					os << time_buffer;
 				}) },
-				{ "millisecond", new LayoutNode([](LayoutNode* layoutNode, EasyMessage* easyMessage, std::ostream& os) {
+				{ "millisecond", new LayoutNode([](LayoutNode* layoutNode, EasylogMessage* easylogMessage, std::ostream& os) {
 					os << std::setw(layoutNode->arg) << std::setfill('0') << sTime.millisecondPart();
 				}) }
 			};
@@ -360,19 +364,20 @@ BEGIN_NAMESPACE_BUNDLE {
 	void EasylogInternal::send_to_network(LevelNode* levelNode, const std::string& s) {
 	}
 
-	void EasylogInternal::log_message(EasyMessage* easyMessage) {
-		if (!this->isstop() && easyMessage->level() >= this->level()) {
-			LevelNode* levelNode = &this->_levels[easyMessage->level()];
+	void EasylogInternal::log_message(EasylogMessage* easylogMessage) {
+		if (!this->isstop() && easylogMessage->level() >= this->level()) {
+			LevelNode* levelNode = &this->_levels[easylogMessage->level()];
 			
 #ifdef ENABLE_ASYNC_SEND
-			this->_logQueue.push_back(new LogNode(levelNode, easyMessage->buffer()));
+			easylogMessage->log()->levelNode = levelNode;
+			this->_logQueue.push_back(easylogMessage->log());
 			this->_logCondition.notify_all();
 #else
-			const std::string& s = easyMessage->buffer()->str();
+			const std::string& s = easylogMessage->log()->buffer.str();
 			this->send_to_stdout(levelNode, s);
 			this->send_to_file(levelNode, s);
 			this->send_to_network(levelNode, s);
-			delete easyMessage->buffer();
+			delete easylogMessage->log();
 #endif
 		}		
 	}
@@ -380,14 +385,13 @@ BEGIN_NAMESPACE_BUNDLE {
 #ifdef ENABLE_ASYNC_SEND
 	void EasylogInternal::logProcess() {
 		while (true) {
-			LogNode* logNode = this->_logQueue.pop_front();
+			EasylogNode* logNode = this->_logQueue.pop_front();
 			if (logNode) {
 				assert(logNode->log);
-				const std::string& s = logNode->log->str();
+				const std::string& s = logNode->buffer.str();
 				this->send_to_stdout(logNode->levelNode, s);
 				this->send_to_file(logNode->levelNode, s);
 				this->send_to_network(logNode->levelNode, s);
-				SafeDelete(logNode->log);
 				SafeDelete(logNode);
 			}
 			else {

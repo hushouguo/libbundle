@@ -17,11 +17,11 @@ BEGIN_NAMESPACE_BUNDLE {
 		MAX_LEVEL =	6,
 	};
 
-#define Trace	bundle::EasyMessage(bundle::Easylog::syslog(), bundle::TRACE, __FILE__, __LINE__, __FUNCTION__)
-#define Alarm	bundle::EasyMessage(bundle::Easylog::syslog(), bundle::ALARM, __FILE__, __LINE__, __FUNCTION__)
-#define Error	bundle::EasyMessage(bundle::Easylog::syslog(), bundle::ERROR, __FILE__, __LINE__, __FUNCTION__)
-#define Panic	bundle::EasyMessage(bundle::Easylog::syslog(), bundle::PANIC, __FILE__, __LINE__, __FUNCTION__)
-#define System	bundle::EasyMessage(bundle::Easylog::syslog(), bundle::SYSTEM, __FILE__, __LINE__, __FUNCTION__)
+#define Trace	bundle::EasylogMessage(bundle::Easylog::syslog(), bundle::TRACE, __FILE__, __LINE__, __FUNCTION__)
+#define Alarm	bundle::EasylogMessage(bundle::Easylog::syslog(), bundle::ALARM, __FILE__, __LINE__, __FUNCTION__)
+#define Error	bundle::EasylogMessage(bundle::Easylog::syslog(), bundle::ERROR, __FILE__, __LINE__, __FUNCTION__)
+#define Panic	bundle::EasylogMessage(bundle::Easylog::syslog(), bundle::PANIC, __FILE__, __LINE__, __FUNCTION__)
+#define System	bundle::EasylogMessage(bundle::Easylog::syslog(), bundle::SYSTEM, __FILE__, __LINE__, __FUNCTION__)
 
 #ifdef assert
 #undef assert
@@ -115,10 +115,11 @@ BEGIN_NAMESPACE_BUNDLE {
 	};
 
 	class Easylog;
-	class EasyMessage : public std::ostream {
+	class EasylogNode;
+	class EasylogMessage : public std::ostream {
 		public:
-			EasyMessage(Easylog* easylog, EasylogSeverityLevel level, std::string file, int line, std::string func);
-			~EasyMessage();
+			EasylogMessage(Easylog* easylog, EasylogSeverityLevel level, std::string file, int line, std::string func);
+			~EasylogMessage();
 
 		public:
 			void cout(const char* format, ...);
@@ -130,7 +131,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			inline int line() { return this->_line; }
 			inline const std::string& function() { return this->_function; }
 #endif			
-			inline std::stringbuf* buffer() { return this->_buffer; }
+			inline EasylogNode* log() { return this->_log; }
 			
 		private:
 			Easylog* _easylog = nullptr;
@@ -140,11 +141,10 @@ BEGIN_NAMESPACE_BUNDLE {
 			int _line = -1;
 			std::string _function;
 #endif			
-			std::stringbuf* _buffer = nullptr;
+			EasylogNode* _log = nullptr;
 			void flush();
 	};
 
-	class LayoutNode;
 	class Easylog {
 		public:
 			virtual ~Easylog() = 0;
@@ -174,8 +174,8 @@ BEGIN_NAMESPACE_BUNDLE {
 			static Easylog* syslog();
 			
 		private:
-			friend class EasyMessage;
-			virtual void log_message(EasyMessage* easyMessage) = 0;
+			friend class EasylogMessage;
+			virtual void log_message(EasylogMessage* easylogMessage) = 0;
 	};
 
 	struct EasylogCreator {
