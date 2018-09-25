@@ -37,7 +37,8 @@ BEGIN_NAMESPACE_BUNDLE {
 			std::thread* _threadAccept = nullptr;
 			std::thread* _threadConnection = nullptr;
 			
-			std::mutex _fdslocker;
+			//std::mutex _fdslocker;
+			Spinlocker _fdslocker;
 			std::list<SOCKET> _connfds;
 
 			SOCKET _fd = BUNDLE_INVALID_SOCKET;
