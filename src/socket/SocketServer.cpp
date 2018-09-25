@@ -91,7 +91,8 @@ BEGIN_NAMESPACE_BUNDLE {
 			this->acceptProcess();
 		});
 		
-		//Trace.cout("SocketServer listening on %s:%d", address, port);
+		Debug.cout("SocketServer listening on %s:%d", address, port);
+		
 		return true;
 	}
 
@@ -120,7 +121,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			std::lock_guard<std::mutex> guard(this->_fdslocker);
 			this->_connfds.push_back(s);
 		}
-		//Trace << "acceptProcess thread exit";
+		Debug << "acceptProcess thread exit";
 	}
 
 	void SocketServerInternal::connectionProcess() {
@@ -285,7 +286,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			SafeDelete(so);
 		}
 		
-		//Trace << "connectionProcess thread exit, maxfd: " << maxfd;
+		Debug << "connectionProcess thread exit, maxfd: " << maxfd;
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////
@@ -327,8 +328,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	Socketmessage* SocketServerInternal::initMessage(size_t payload_len) {
-		Socketmessage* msg = allocateMessage(BUNDLE_INVALID_SOCKET, SM_OPCODE_MESSAGE, payload_len);
-		return msg;
+		return allocateMessage(BUNDLE_INVALID_SOCKET, SM_OPCODE_MESSAGE, payload_len);
 	}
 
 	void* SocketServerInternal::getMessageData(Socketmessage* msg) {
@@ -336,8 +336,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 	
 	void SocketServerInternal::sendMessage(SOCKET s, const Socketmessage* msg) {
-		//TODO: msg->s = s;
-		((Socketmessage*) msg)->s = s;
+		((Socketmessage*)msg)->s = s;
 		this->pushMessage(msg);
 	}
 

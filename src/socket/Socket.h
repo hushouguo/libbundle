@@ -19,7 +19,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			~Socket() {
 				this->close();
 				for (auto& msg : this->_sendlist) {
-					releaseMessage(msg);
+					bundle::releaseMessage(msg);
 				}
 				this->_sendlist.clear();
 			}

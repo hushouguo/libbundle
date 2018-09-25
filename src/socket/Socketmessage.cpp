@@ -5,8 +5,11 @@
 
 #include "bundle.h"
 
+#define MAGIC	0x12345678	
+#define INTERNAL_SIGN	0x77abc3694dfb225e
+
+
 BEGIN_NAMESPACE_BUNDLE {
-	//static std::atomic<int> allocated_messages = 0;
 	Socketmessage* allocateMessage(SOCKET s, u8 opcode) {
 		Socketmessage* msg = (Socketmessage*) ::malloc(sizeof(Socketmessage));
 		msg->magic = MAGIC;

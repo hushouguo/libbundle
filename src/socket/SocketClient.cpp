@@ -72,7 +72,8 @@ BEGIN_NAMESPACE_BUNDLE {
 			return false;
 		}
 				
-		//Trace.cout("SocketClient establish with %s:%d", this->_address.c_str(), this->_port);	
+		Debug.cout("SocketClient establish with %s:%d", this->_address.c_str(), this->_port);
+		
 		return this->_active = true;
 	}
 	
@@ -210,8 +211,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	Socketmessage* SocketClientInternal::initMessage(size_t payload_len) {
-		Socketmessage* msg = allocateMessage(this->fd(), SM_OPCODE_MESSAGE, payload_len);
-		return msg;
+		return allocateMessage(this->fd(), SM_OPCODE_MESSAGE, payload_len);
 	}
 
 	void* SocketClientInternal::getMessageData(Socketmessage* msg) {
@@ -219,7 +219,6 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 	
 	void SocketClientInternal::sendMessage(const Socketmessage* msg) {
-		//Socketmessage* msg = (Socketmessage *) ((Byte*) rawmsg - offsetof(Socketmessage, rawmsg));
 		this->pushMessage(msg);
 	}
 
@@ -229,7 +228,6 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 	
 	void SocketClientInternal::releaseMessage(const Socketmessage* msg) {
-		//Socketmessage* msg = (Socketmessage *) ((Byte*) rawmsg - offsetof(Socketmessage, rawmsg));
 		bundle::releaseMessage(msg);
 	}
 	
