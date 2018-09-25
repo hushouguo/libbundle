@@ -26,10 +26,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			inline bool connect_in_progress() { return this->_connect_in_progress; }
 			const Socketmessage* receiveMessage(bool& establish, bool& close) override;			
 			void sendMessage(const void* payload, size_t payload_len) override;
-			Socketmessage* initMessage(size_t) override;
-			void* getMessageData(Socketmessage*) override;
 			void sendMessage(const Socketmessage*) override;
-			void releaseMessage(const Socketmessage*) override;
 
 		public:
 			void clientProcess();
@@ -44,9 +41,10 @@ BEGIN_NAMESPACE_BUNDLE {
 			std::string _address;
 			int _port = 0;
 			
-			std::mutex _rlocker, _wlocker;
-			std::list<const Socketmessage *> _rlist;
-			std::list<const Socketmessage *> _wlist;
+			//std::mutex _rlocker, _wlocker;
+			//std::list<const Socketmessage *> _rlist;
+			//std::list<const Socketmessage *> _wlist;
+			LockfreeQueue<Socketmessage> _rQueue, _wQueue; 
 
 			bool connectServer();
 			void pushMessage(const Socketmessage* msg);
@@ -107,8 +105,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		};
 
 		auto pushMessage = [&](Socketmessage* msg) {
-			std::lock_guard<std::mutex> guard(this->_rlocker);
-			this->_rlist.push_back(msg);
+			this->_rQueue.push_back(msg);
 		};
 
 		auto addSocket = [&](SOCKET s) {
@@ -165,10 +162,12 @@ BEGIN_NAMESPACE_BUNDLE {
 			}
 			else {
 				addSocket(this->fd());
-				while (!this->_wlist.empty() && this->active() && this->_wlocker.try_lock()) {
-					const Socketmessage* msg = this->_wlist.front();
-					this->_wlist.pop_front();
-					this->_wlocker.unlock();
+				//while (!this->_wlist.empty() && this->active() && this->_wlocker.try_lock()) {
+				if (this->_wQueue.size() > 0) {
+					//const Socketmessage* msg = this->_wlist.front();
+					const Socketmessage* msg = this->_wQueue.pop_front();
+					//this->_wlist.pop_front();
+					//this->_wlocker.unlock();
 					assert(msg->magic == MAGIC);
 					if (!getSocket(msg->s)) {
 						bundle::releaseMessage(msg);
@@ -188,19 +187,17 @@ BEGIN_NAMESPACE_BUNDLE {
 	
 	const Socketmessage* SocketClientInternal::receiveMessage(bool& establish, bool& close) {
 		establish = close = false;
-		if (!this->_rlist.empty() && this->_rlocker.try_lock()) {
-			const Socketmessage* msg = this->_rlist.front();
-			this->_rlist.pop_front();
-			this->_rlocker.unlock();
+		const Socketmessage* msg = this->_rQueue.pop_front();
+		if (msg) {
 			assert(msg->magic == MAGIC);
 			switch (msg->opcode) {
-				case SM_OPCODE_ESTABLISH: establish = true; return msg;
-				case SM_OPCODE_CLOSE: close = true; return msg;
-				case SM_OPCODE_MESSAGE: return msg;
-				default: Error.cout("illegal opcode: %d", msg->opcode); break;
+				case SM_OPCODE_ESTABLISH: establish = true; break;
+				case SM_OPCODE_CLOSE: close = true; break;
+				case SM_OPCODE_MESSAGE: break;
+				default: assert(false); break;
 			}
 		}
-		return nullptr;
+		return msg;
 	}
 
 	void SocketClientInternal::sendMessage(const void* payload, size_t payload_len) {
@@ -209,28 +206,15 @@ BEGIN_NAMESPACE_BUNDLE {
 		Socketmessage* msg = allocateMessage(this->fd(), SM_OPCODE_MESSAGE, payload, payload_len);
 		this->pushMessage(msg);
 	}
-
-	Socketmessage* SocketClientInternal::initMessage(size_t payload_len) {
-		return allocateMessage(this->fd(), SM_OPCODE_MESSAGE, payload_len);
-	}
-
-	void* SocketClientInternal::getMessageData(Socketmessage* msg) {
-		return msg->payload;
-	}
 	
 	void SocketClientInternal::sendMessage(const Socketmessage* msg) {
 		this->pushMessage(msg);
 	}
 
 	void SocketClientInternal::pushMessage(const Socketmessage* msg) {
-		std::lock_guard<std::mutex> guard(this->_wlocker);
-		this->_wlist.push_back(msg);
+		this->_wQueue.push_back(msg);
 	}
-	
-	void SocketClientInternal::releaseMessage(const Socketmessage* msg) {
-		bundle::releaseMessage(msg);
-	}
-	
+		
 	void SocketClientInternal::stop() {
 		if (!this->isstop()) {
 			this->_stop = true;

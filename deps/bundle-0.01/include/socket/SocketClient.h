@@ -18,10 +18,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			virtual bool active() = 0;
 			virtual const Socketmessage* receiveMessage(bool& establish, bool& close) = 0;
 			virtual void sendMessage(const void*, size_t) = 0;
-			virtual Socketmessage* initMessage(size_t) = 0;
-			virtual void* getMessageData(Socketmessage*) = 0;
 			virtual void sendMessage(const Socketmessage*) = 0;
-			virtual void releaseMessage(const Socketmessage*) = 0;
 	};
 
 	struct SocketClientCreator {

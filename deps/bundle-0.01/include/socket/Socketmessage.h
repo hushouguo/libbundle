@@ -13,6 +13,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	void releaseMessage(const Socketmessage*);
 	const void* messagePayload(const Socketmessage*);
 	size_t messagePayloadLength(const Socketmessage*);
+	const Socketmessage* getMessage(const void*);
 }
 
 #endif

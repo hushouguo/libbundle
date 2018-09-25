@@ -126,7 +126,7 @@ BEGIN_NAMESPACE_BUNDLE {
 						this->_wbuffer.append(buffer + size_t(sendsize), len - size_t(sendsize));
 					}
 					assert(msg);
-					releaseMessage(msg);
+					bundle::releaseMessage(msg);
 				}
 			}
 		}

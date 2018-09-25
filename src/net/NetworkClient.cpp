@@ -56,9 +56,9 @@ BEGIN_NAMESPACE_BUNDLE {
 		CHECK_RETURN(this->_socketClient, false, "please call `connect` to init client");
 		while (!this->isstop()) {
 			bool is_establish = false, is_close = false;
-			bool rc = true;
 			const Socketmessage* msg = this->_socketClient->receiveMessage(is_establish, is_close);
 			if (msg) {
+				bool rc = true;
 				if (is_establish) {
 					if (this->_establishConnection) {
 						this->_establishConnection(this);
@@ -71,16 +71,14 @@ BEGIN_NAMESPACE_BUNDLE {
 				}
 				else {
 					if (this->_msgParser) {
-						//const Netmessage* netmsg = (Netmessage*)msg->payload;
 						const Netmessage* netmsg = (const Netmessage *) messagePayload(msg);
-						size_t len = messagePayloadLength(msg);
-						//assert(msg->payload_len == netmsg->len);
-						assert(len == netmsg->len);
+						size_t payload_len = messagePayloadLength(msg);
+						assert(payload_len == netmsg->len);
 						rc = this->_msgParser(this, netmsg);
 					}
 				}
 				if (rc) {
-					this->socketClient()->releaseMessage(msg);
+					bundle::releaseMessage(msg);
 				}
 			}
 			else {
@@ -91,13 +89,8 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	void NetworkClient::releaseMessage(const Netmessage* netmsg) {
-		//TODO:
-#if 0
-		Socketmessage* msg = (Socketmessage *) ((Byte*) netmsg - offsetof(Socketmessage, payload));
-		assert(msg->payload_len == netmsg->len);
-		assert(this->socketClient());
-		this->socketClient()->releaseMessage(msg);
-#endif		
+		const Socketmessage* msg = getMessage(netmsg);
+		bundle::releaseMessage(msg);
 	}
 
 	void NetworkClient::stop() {

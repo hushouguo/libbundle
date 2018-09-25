@@ -22,11 +22,8 @@ BEGIN_NAMESPACE_BUNDLE {
 			void stop() override;
 			inline bool isstop() { return this->_stop; }
 			const Socketmessage* receiveMessage(SOCKET& s, bool& establish, bool& close) override;
-			Socketmessage* initMessage(size_t) override;
 			void sendMessage(SOCKET s, const void*, size_t) override;
-			void* getMessageData(Socketmessage*) override;
 			void sendMessage(SOCKET s, const Socketmessage*) override;
-			void releaseMessage(const Socketmessage*) override;
 			void close(SOCKET s) override;
 			size_t size() override;
 			bool setsockopt(int opt, const void* optval, size_t optlen) override;
@@ -316,10 +313,6 @@ BEGIN_NAMESPACE_BUNDLE {
 		this->pushMessage(msg);
 	}
 	
-	void SocketServerInternal::releaseMessage(const Socketmessage* msg) {
-		bundle::releaseMessage(msg);
-	}
-
 	void SocketServerInternal::sendMessage(SOCKET s, const void* payload, size_t payload_len) {
 		assert(payload);
 		assert(payload_len > 0);
@@ -327,14 +320,6 @@ BEGIN_NAMESPACE_BUNDLE {
 		this->pushMessage(msg);
 	}
 
-	Socketmessage* SocketServerInternal::initMessage(size_t payload_len) {
-		return allocateMessage(BUNDLE_INVALID_SOCKET, SM_OPCODE_MESSAGE, payload_len);
-	}
-
-	void* SocketServerInternal::getMessageData(Socketmessage* msg) {
-		return msg->payload;
-	}
-	
 	void SocketServerInternal::sendMessage(SOCKET s, const Socketmessage* msg) {
 		((Socketmessage*)msg)->s = s;
 		this->pushMessage(msg);

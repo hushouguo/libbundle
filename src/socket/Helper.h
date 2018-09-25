@@ -30,6 +30,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 #pragma pack(push, 1)
 	struct Socketmessage {
+		Socketmessage* next;
 		u32 magic;
 		SOCKET s;
 		u8 opcode;
@@ -41,7 +42,6 @@ BEGIN_NAMESPACE_BUNDLE {
 	Socketmessage* allocateMessage(SOCKET s, u8 opcode);
 	Socketmessage* allocateMessage(SOCKET s, u8 opcode, size_t payload_len);
 	Socketmessage* allocateMessage(SOCKET s, u8 opcode, const void* payload, size_t payload_len);
-	//void releaseMessage(const Socketmessage* msg);
 }
 
 #endif

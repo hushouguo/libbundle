@@ -679,7 +679,7 @@ bool RecordProcess::SlotDatabase::createTable(const char* table, const Entity* e
 		CHECK_CONTINUE(v2m.find(value.type) != v2m.end(), "illegal ValueType: %d", value.type);
 		enum_field_types field_type = v2m[value.type](value);
 		CHECK_CONTINUE(m2string.find(field_type) != m2string.end(), "illegal field type: %d", field_type);		
-		sql << ", `" << iterator.first << "` " << m2string[field_type] << " NOT NULL";	//TODO: KEY setting
+		sql << ", `" << iterator.first << "` " << m2string[field_type] << " NOT NULL";
 	}
 	sql << ") ENGINE=InnoDB DEFAULT CHARSET=utf8";
 	//Trace << "createTable: " << sql.str();

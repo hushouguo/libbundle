@@ -415,7 +415,7 @@ BEGIN_NAMESPACE_BUNDLE {
 				this->_logCondition.wait(locker);
 			}
 		}
-		fprintf(stderr, "logProcess thread exit, logQueue: %ld\n", this->_logQueue.size());
+		fprintf(stderr, "Easylog exit, logQueue: %ld\n", this->_logQueue.size());
 	}
 #endif
 
@@ -588,7 +588,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	void EasylogInternal::set_toserver(EasylogSeverityLevel level, std::string address, int port) {
-		//TODO:
+		//TODO: toserver by MessageQueue
 	}
 			
 	void EasylogInternal::set_color(EasylogSeverityLevel level, EasylogColor color) {

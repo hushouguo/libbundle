@@ -48,7 +48,6 @@ BEGIN_NAMESPACE_BUNDLE {
 			const Socketmessage* receiveMessage(SOCKET& s, bool& establish, bool& close) override;
 			void sendMessage(SOCKET s, const void*, size_t) override;
 			//void sendMessage(SOCKET s, const Socketmessage*) override;
-			void releaseMessage(const Socketmessage* msg) override { this->_socketServer->releaseMessage(msg); }
 			void close(SOCKET s) override { this->_socketServer->close(s); }
 			size_t size() override { return this->_socketServer->size(); }
 			bool setsockopt(int opt, const void* optval, size_t optlen) override { return this->_socketServer->setsockopt(opt, optval, optlen); }
@@ -139,7 +138,7 @@ BEGIN_NAMESPACE_BUNDLE {
         }
 
         if (establish) {
-        	this->_socketServer->releaseMessage(msg);
+        	bundle::releaseMessage(msg);
         	return nullptr; // Websocket needs to wait for the handshake to establish.
         }
 
@@ -159,12 +158,12 @@ BEGIN_NAMESPACE_BUNDLE {
 		bool forward = false;
 		if (!this->parsePackage(s, msg, forward)) {
 			this->_socketServer->close(s);
-			this->_socketServer->releaseMessage(msg);
+			bundle::releaseMessage(msg);
 			return nullptr;
 		}
 
 		if (!forward) {
-			this->_socketServer->releaseMessage(msg);
+			bundle::releaseMessage(msg);
 			return nullptr;
 		}
 
@@ -215,7 +214,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			case WS_OPCODE_CONTINUE:
 				if (true) {
 					Socketmessage* newmsg = allocateMessage(s, SM_OPCODE_MESSAGE, msg->payload + offset, payload_len);
-					this->_socketServer->releaseMessage(msg);
+					bundle::releaseMessage(msg);
 					//memmove(msg->payload, msg->payload + offset, payload_len);
 					//msg->payload_len = payload_len;
 					msg = newmsg;

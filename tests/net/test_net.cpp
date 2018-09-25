@@ -46,7 +46,7 @@ void createServer(u32 msgsize) {
 					//printf("receive rawmsg: %d from SOCKET: %d\n", rawmsg->payload_len, s);
 					++n;
 				}
-				ss->releaseMessage(msg);
+				bundle::releaseMessage(msg);
 			}
 			else {
 				std::this_thread::sleep_for(std::chrono::milliseconds(1));	
