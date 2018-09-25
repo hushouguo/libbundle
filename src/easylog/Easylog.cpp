@@ -235,7 +235,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			bool set_layout(EasylogSeverityLevel level, std::string layout) override;
 			const std::list<EasylogLayoutNode*>& layout_prefix(EasylogSeverityLevel level) override { return this->_levels[level].layouts_prefix; }
 			const std::list<EasylogLayoutNode*>& layout_postfix(EasylogSeverityLevel level) override { return this->_levels[level].layouts_postfix; }
-#endif			
+#endif
 			inline bool isstop() { return this->_stop; }
 			void stop() override;
 

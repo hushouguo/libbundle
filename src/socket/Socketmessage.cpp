@@ -9,31 +9,32 @@
 BEGIN_NAMESPACE_BUNDLE {
 	//static std::atomic<int> allocated_messages = 0;
 	Socketmessage* allocateMessage(SOCKET s, u8 opcode) {
-		Socketmessage* msg = (Socketmessage*) ::malloc(sizeof(Socketmessage) + sizeof(Rawmessage));
+		Socketmessage* msg = (Socketmessage*) ::malloc(sizeof(Socketmessage));
 		msg->magic = MAGIC;
 		msg->s = s;
 		msg->opcode = opcode;
-		msg->rawmsg->payload_len = 0;
+		msg->payload_len = 0;
 		return msg;
 	}
 
 	Socketmessage* allocateMessage(SOCKET s, u8 opcode, size_t payload_len) {
-		Socketmessage* msg = (Socketmessage*) ::malloc(sizeof(Socketmessage) + sizeof(Rawmessage) + payload_len);
+		Socketmessage* msg = (Socketmessage*) ::malloc(sizeof(Socketmessage) + payload_len);
 		msg->magic = MAGIC;
 		msg->s = s;
 		msg->opcode = opcode;
-		msg->rawmsg->payload_len = payload_len;
+		msg->payload_len = payload_len;
 		return msg;
 	}
 
 	Socketmessage* allocateMessage(SOCKET s, u8 opcode, const void* payload, size_t payload_len) {
-		Socketmessage* msg = (Socketmessage*) ::malloc(sizeof(Socketmessage) + sizeof(Rawmessage) + payload_len);
+		Socketmessage* msg = (Socketmessage*) ::malloc(sizeof(Socketmessage) + payload_len);
 		msg->magic = MAGIC;
 		msg->s = s;
 		msg->opcode = opcode;
-		assert(payload);
-		memcpy(msg->rawmsg->payload, payload, payload_len);
-		msg->rawmsg->payload_len = payload_len;
+		msg->payload_len = payload_len;
+		if (payload) {
+			memcpy(msg->payload, payload, payload_len);
+		}
 		return msg;
 	}
 	

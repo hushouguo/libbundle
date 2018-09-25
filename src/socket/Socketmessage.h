@@ -20,7 +20,8 @@ BEGIN_NAMESPACE_BUNDLE {
 		u32 magic;
 		SOCKET s;
 		u8 opcode;
-		Rawmessage rawmsg[0];
+		u32 payload_len;
+		u8 payload[0];
 	};
 #pragma pack(pop)
 	Socketmessage* allocateMessage(SOCKET s, u8 opcode);
