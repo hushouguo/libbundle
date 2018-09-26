@@ -41,9 +41,6 @@ BEGIN_NAMESPACE_BUNDLE {
 			std::string _address;
 			int _port = 0;
 			
-			//std::mutex _rlocker, _wlocker;
-			//std::list<const Socketmessage *> _rlist;
-			//std::list<const Socketmessage *> _wlist;
 			LockfreeQueue<Socketmessage> _rQueue, _wQueue; 
 
 			bool connectServer();
@@ -162,12 +159,8 @@ BEGIN_NAMESPACE_BUNDLE {
 			}
 			else {
 				addSocket(this->fd());
-				//while (!this->_wlist.empty() && this->active() && this->_wlocker.try_lock()) {
 				if (this->_wQueue.size() > 0) {
-					//const Socketmessage* msg = this->_wlist.front();
 					const Socketmessage* msg = this->_wQueue.pop_front();
-					//this->_wlist.pop_front();
-					//this->_wlocker.unlock();
 					assert(msg->magic == MAGIC);
 					if (!getSocket(msg->s)) {
 						bundle::releaseMessage(msg);
@@ -176,7 +169,7 @@ BEGIN_NAMESPACE_BUNDLE {
 						writeMessage(msg->s, msg);
 					}
 				}				
-				poll.run(1, readSocket, writeSocket, removeSocket);
+				poll.run(-1, readSocket, writeSocket, removeSocket);
 			}
 		}
 
@@ -214,6 +207,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 	void SocketClientInternal::pushMessage(const Socketmessage* msg) {
 		this->_wQueue.push_back((Socketmessage*)msg);
+		//TODO: send signal to connectionProcess or wakeup epoll_wait
 	}
 		
 	void SocketClientInternal::stop() {

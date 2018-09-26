@@ -36,5 +36,16 @@ BEGIN_NAMESPACE_BUNDLE {
 		CHECK_RETURN(rc == 0, false, "epoll_del error: %d, %s", errno, strerror(errno));
 		return true;
 	}
+
+	bool Poll::setSocketPollout(SOCKET s, bool value) {
+		struct epoll_event ee;
+		ee.events = value ? (EPOLLET | EPOLLIN | EPOLLOUT | EPOLLERR) : (EPOLLET | EPOLLIN | EPOLLERR);
+		ee.data.u64 = 0; /* avoid valgrind warning */
+		ee.data.fd = s;
+		/* Note, Kernel < 2.6.9 requires a non null event pointer even for EPOLL_CTL_DEL. */
+		int rc = epoll_ctl(this->_epfd, EPOLL_CTL_MOD, s, &ee);
+		CHECK_RETURN(rc == 0, false, "epoll_mod error: %d, %s", errno, strerror(errno));
+		return true;
+	}
 }
 

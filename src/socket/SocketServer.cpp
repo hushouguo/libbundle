@@ -95,7 +95,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	void SocketServerInternal::acceptProcess() {
 		struct sigaction act;
         act.sa_handler = [](int sig) {
-			Alarm << "acceptProcess receive signal: " << sig;
+			Debug << "acceptProcess receive signal: " << sig;
 		}; // sa_handler will not take effect if it is not set, different with connectSignal implement
         sigemptyset(&act.sa_mask);  
         sigaddset(&act.sa_mask, SIGTERM);
@@ -106,28 +106,20 @@ BEGIN_NAMESPACE_BUNDLE {
 		while (!this->isstop()) {
 			struct sockaddr_in clientaddr;
 			socklen_t len = sizeof(clientaddr);
-
 			SOCKET s = ::accept(this->_fd, (struct sockaddr*)&clientaddr, &len);
-			fprintf(stderr, "::accept wakeup\n");
 			if (s == 0) {
 				CHECK_RETURN(false, void(0), "accept error:%d,%s", errno, strerror(errno));
 			}
 			else if (s < 0) {
 				if (interrupted()) {
-					fprintf(stderr, "acceptProcess receive EINTR\n");
 					continue;
 				}
-
 				if (wouldblock()) {
 					//std::this_thread::sleep_for(std::chrono::milliseconds(1));
-					fprintf(stderr, "acceptProcess receive EAGAIN\n");
 					continue; // no more connection
 				}
-
 				CHECK_RETURN(false, void(0), "accept error:%d,%s", errno, strerror(errno));
 			}
-
-			//std::lock_guard<std::mutex> guard(this->_fdslocker);
 			this->_fdslocker.lock();
 			this->_connfds.push_back(s);
 			this->_fdslocker.unlock();
