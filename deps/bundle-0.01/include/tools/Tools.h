@@ -74,7 +74,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	void* memdup(void* buffer, size_t size);
 	void setProcesstitle(int argc, char* argv[], const char* title);
 	void resetProcesstitle(int argc, char* argv[]);
-	
+
 
 	// This function does not distinguish between a missing key and a key mapped
 	// to a NULL value.

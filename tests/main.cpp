@@ -14,6 +14,15 @@
 #include "lockfree/test_lockfree.h"
 
 int main() {
+	struct sigaction act;
+	act.sa_handler = [](int sig) {
+		fprintf(stderr, "main thread receive signal: %d\n", sig);
+	};
+	sigemptyset(&act.sa_mask);  
+	sigaddset(&act.sa_mask, SIGALRM);
+	act.sa_flags = SA_INTERRUPT; //The system call that is interrupted by this signal will not be restarted automatically
+	sigaction(SIGALRM, &act, nullptr);		
+
 	bundle::Easylog::syslog()->set_tostdout(bundle::GLOBAL, true);
 
 	//test_tools();
