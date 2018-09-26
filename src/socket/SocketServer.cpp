@@ -8,7 +8,8 @@
 #include "Socket.h"
 #include "Poll.h"
 
-#define MAX_CONNECTION_FD	65536
+#define MAX_CONNECTION_FD		65536
+#define NM_CONNECTION_THREAD	4
 
 BEGIN_NAMESPACE_BUNDLE {
 	class SocketServerInternal : public SocketServer {
@@ -31,20 +32,24 @@ BEGIN_NAMESPACE_BUNDLE {
 
 		public:
 			void acceptProcess();
-			void connectionProcess();
+			void connectionProcess(SlotConnection* slot);
 
 		private:
 			std::thread* _threadAccept = nullptr;
-			std::thread* _threadConnection = nullptr;
+			LockfreeQueue<Socketmessage> _readQueue;
 			
-			Spinlocker _fdslocker;
-			std::list<SOCKET> _connfds;
+			struct SlotConnection {
+				std::thread* threadConnection = nullptr;
+				LockfreeQueue<Socketmessage> writeQueue;
+				Spinlocker fdslocker;
+				std::list<SOCKET> connfds;
+			} _slotConnection[NM_CONNECTION_THREAD];			
 
 			SOCKET _fd = BUNDLE_INVALID_SOCKET;
 			bool _stop = true;
-			size_t _opts[BUNDLE_SOL_MAX], _size = 0;
-			
-			LockfreeQueue<Socketmessage> _readQueue, _writeQueue;
+			size_t _opts[BUNDLE_SOL_MAX];
+			std::atomic<size_t> _size = {0};
+						
 			void pushMessage(const Socketmessage* msg);
 
 			std::function<int(const Byte*, size_t)> _splitMessage = nullptr;
@@ -76,11 +81,13 @@ BEGIN_NAMESPACE_BUNDLE {
 		val = ::listen(this->fd(), SOMAXCONN);
 		CHECK_RETURN(val == 0, false, "listen failure: %d, %s", errno, strerror(errno));
 
-		SafeDelete(this->_threadConnection);
-		this->_threadConnection = new std::thread([this]() {
-			this->connectionProcess();
-		});
-		
+		for (auto& slot : this->_slotConnection) {
+			SafeDelete(slot.threadConnection);
+			slot.threadConnection = new std::thread([this]() {
+				this->connectionProcess();
+			}, &slot);
+		}
+				
 		SafeDelete(this->_threadAccept);
 		this->_threadAccept = new std::thread([this]() {
 			this->acceptProcess();
@@ -119,14 +126,26 @@ BEGIN_NAMESPACE_BUNDLE {
 				}
 				CHECK_RETURN(false, void(0), "accept error:%d,%s", errno, strerror(errno));
 			}
-			this->_fdslocker.lock();
-			this->_connfds.push_back(s);
-			this->_fdslocker.unlock();
+
+			auto& slot = this->_slotConnection[s % NM_CONNECTION_THREAD];
+			slot.fdslocker.lock();
+			slot.connfds.push_back(s);
+			slot.fdslocker.unlock();
 		}
 		Debug << "acceptProcess thread exit";
 	}
 
-	void SocketServerInternal::connectionProcess() {
+	void SocketServerInternal::connectionProcess(SlotConnection* slot) {
+		struct sigaction act;
+        act.sa_handler = [](int sig) {
+			Debug << "connectionProcess receive signal: " << sig;
+		}; // sa_handler will not take effect if it is not set, different with connectSignal implement
+        sigemptyset(&act.sa_mask);
+        sigaddset(&act.sa_mask, SIGALRM);
+        act.sa_flags = SA_INTERRUPT; //The system call that is interrupted by this signal will not be restarted automatically
+        sigaction(SIGALRM, &act, nullptr);
+
+	
 		Poll poll;
 		Socket* sockets[MAX_CONNECTION_FD];
 		memset(sockets, 0, sizeof(sockets));
@@ -235,16 +254,16 @@ BEGIN_NAMESPACE_BUNDLE {
 		while (!this->isstop()) {
 			checkConnection();
 			
-			while (!this->_connfds.empty()) {
-				this->_fdslocker.lock();
-				SOCKET s = this->_connfds.front();
-				this->_connfds.pop_front();
-				this->_fdslocker.unlock();
+			while (!slot->connfds.empty()) {
+				slot->fdslocker.lock();
+				SOCKET s = slot->connfds.front();
+				slot->connfds.pop_front();
+				slot->fdslocker.unlock();
 				addSocket(s);
 			}
 
-			while (this->_writeQueue.size() > 0) {
-				const Socketmessage* msg = this->_writeQueue.pop_front();
+			while (slot->writeQueue.size() > 0) {
+				const Socketmessage* msg = slot->writeQueue.pop_front();
 				assert(msg);
 				assert(msg->magic == MAGIC);
 				if (msg->s == BUNDLE_BROADCAST_SOCKET) {
@@ -280,14 +299,14 @@ BEGIN_NAMESPACE_BUNDLE {
 				}
 			}
 
-			poll.run(1, readSocket, writeSocket, removeSocket);
+			poll.run(-1, readSocket, writeSocket, removeSocket);
 		}
 		
 		for (auto& so : sockets) {
 			SafeDelete(so);
 		}
 		
-		Debug << "connectionProcess thread exit, maxfd: " << maxfd;
+		Debug << "connectionProcess thread exit, maxfd: " << maxfd << ", writeQueue: " << slot->writeQueue.size() << ", connfds: " << slot->connfds.size();
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////
@@ -328,7 +347,12 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	void SocketServerInternal::pushMessage(const Socketmessage* msg) {
-		this->_writeQueue.push_back((Socketmessage*)msg);
+		assert(msg->s != BUNDLE_INVALID_SOCKET);
+		auto& slot = this->_slotConnection[msg->s % NM_CONNECTION_THREAD];
+		slot.writeQueue.push_back((Socketmessage*)msg);
+		if (slot.threadConnection) {
+			pthread_kill(slot.threadConnection->native_handle(), SIGALRM);
+		}
 	}
 	
 	void SocketServerInternal::stop() {
@@ -341,9 +365,27 @@ BEGIN_NAMESPACE_BUNDLE {
 				}
 			}
 
-			if (this->_threadConnection && this->_threadConnection->joinable()) {
-				this->_threadConnection->join();
+
+			for (auto& slot : this->_slotConnection) {
+				if (slot.threadConnection) {
+					pthread_kill(slot.threadConnection->native_handle(), SIGALRM);	
+					if (slot.threadConnection->joinable()) {
+						slot.threadConnection->join();
+					}
+				}
+				
+				// release writeQueue messages
+				for (;;) {
+					Socketmessage* msg = slot.writeQueue.pop_front();
+					if (!msg) {
+						break;
+					}
+					bundle::releaseMessage(msg);
+				}
+
+				SafeDelete(slot.threadConnection);
 			}
+			
 
 			// release readQueue messages
 			for (;;) {
@@ -354,14 +396,6 @@ BEGIN_NAMESPACE_BUNDLE {
 				bundle::releaseMessage(msg);
 			}
 
-			// release writeQueue messages
-			for (;;) {
-				Socketmessage* msg = this->_writeQueue.pop_front();
-				if (!msg) {
-					break;
-				}
-				bundle::releaseMessage(msg);
-			}
 
 			// close connection
 			for (auto s : this->_connfds) {
@@ -376,7 +410,6 @@ BEGIN_NAMESPACE_BUNDLE {
 
 			// destroy accept thread & i/o thread
 			SafeDelete(this->_threadAccept);
-			SafeDelete(this->_threadConnection);
 		}
 	}
 

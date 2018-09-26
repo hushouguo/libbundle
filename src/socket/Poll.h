@@ -18,9 +18,13 @@ BEGIN_NAMESPACE_BUNDLE {
 			template < typename ReadHandler, typename WriteHandler, typename ErrorHandler >
 			void run(int milliseconds, ReadHandler readHandler, WriteHandler writeHandler, ErrorHandler errorHandler) {
 				/* -1 to block indefinitely, 0 to return immediately, even if no events are available. */
-				//int numevents = TEMP_FAILURE_RETRY(::epoll_wait(this->_epfd, this->_events, NM_POLL_EVENT, milliseconds));
 				int numevents = ::epoll_wait(this->_epfd, this->_events, NM_POLL_EVENT, milliseconds);
-				CHECK_RETURN(numevents >= 0, void(0), "epoll wait error:%d, %s", errno, strerror(errno));
+				if (numevents < 0) {
+					if (interrupted()) {
+						return; // wake up by signal
+					}
+					CHECK_RETURN(false, void(0), "epoll wait error:%d, %s", errno, strerror(errno));
+				}
 				for (int i = 0; i < numevents; ++i) {
 					struct epoll_event* ee = &this->_events[i];
 					if (ee->events & (EPOLLERR | EPOLLHUP)) {
