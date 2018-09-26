@@ -235,7 +235,6 @@ BEGIN_NAMESPACE_BUNDLE {
 		while (!this->isstop()) {
 			checkConnection();
 			
-			//while (!this->_connfds.empty() && this->_fdslocker.try_lock()) {
 			while (!this->_connfds.empty()) {
 				this->_fdslocker.lock();
 				SOCKET s = this->_connfds.front();
@@ -244,11 +243,7 @@ BEGIN_NAMESPACE_BUNDLE {
 				addSocket(s);
 			}
 
-			//while (!this->_wlist.empty() && this->_wlocker.try_lock()) {
 			while (this->_wQueue.size() > 0) {
-				//const Socketmessage* msg = this->_wlist.front();
-				//this->_wlist.pop_front();
-				//this->_wlocker.unlock();
 				const Socketmessage* msg = this->_wQueue.pop_front();
 				assert(msg);
 				assert(msg->magic == MAGIC);
