@@ -19,6 +19,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 		public:
 			virtual SOCKET fd() = 0;
+			virtual bool setWorkerNumber(u32) = 0;
 			virtual bool start(const char* address, int port) = 0;
 			virtual void stop() = 0;
 			virtual const Socketmessage* receiveMessage(SOCKET& s, bool& establish, bool& close) = 0;

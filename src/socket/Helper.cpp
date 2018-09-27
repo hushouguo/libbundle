@@ -61,7 +61,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		bool connectResult = true;
 		
 		struct sigaction act,oldact;
-        //act.sa_handler = connect_sigalarm;  
+        act.sa_handler = [](int){};
         sigemptyset(&act.sa_mask);  
         sigaddset(&act.sa_mask, SIGALRM);  
         act.sa_flags = SA_INTERRUPT; //The system call that is interrupted by this signal will not be restarted automatically

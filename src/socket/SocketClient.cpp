@@ -10,6 +10,7 @@
 
 #define CONNECT_TIMEOUT		10
 #define CONNECT_INTERVAL	5
+#define WAKE_PROCESS_SIGNAL	SIGRTMIN
 
 BEGIN_NAMESPACE_BUNDLE {
 	class SocketClientInternal : public SocketClient {
@@ -29,10 +30,10 @@ BEGIN_NAMESPACE_BUNDLE {
 			void sendMessage(const Socketmessage*) override;
 
 		public:
-			void clientProcess();
+			void workerProcess();
 			
 		private:
-			std::thread* _threadClient = nullptr;
+			std::thread* _threadWorker = nullptr;
 			
 			SOCKET _fd = BUNDLE_INVALID_SOCKET;
 			bool _stop = true, _active = false;
@@ -84,25 +85,17 @@ BEGIN_NAMESPACE_BUNDLE {
 			return false;
 		}
 		
-		SafeDelete(this->_threadClient);
-		this->_threadClient = new std::thread([this]() {
-			this->clientProcess();
+		SafeDelete(this->_threadWorker);
+		this->_threadWorker = new std::thread([this]() {
+			this->workerProcess();
 		});
 		std::this_thread::yield();
 		
 		return true;
 	}
 
-	void SocketClientInternal::clientProcess() {
-		struct sigaction act;
-        act.sa_handler = [](int sig) {
-			//Debug << "clientProcess receive signal: " << sig;
-			//fprintf(stderr, "clientProcess receive signal: %d\n", sig);
-		}; // sa_handler will not take effect if it is not set, different with connectSignal implement
-        sigemptyset(&act.sa_mask);
-        sigaddset(&act.sa_mask, SIGTERM);
-        act.sa_flags = SA_INTERRUPT; //The system call that is interrupted by this signal will not be restarted automatically
-        sigaction(SIGTERM, &act, nullptr);
+	void SocketClientInternal::workerProcess() {
+		setSignal(WAKE_PROCESS_SIGNAL);
 
 		Poll poll;
 		Socket* so = nullptr;
@@ -219,18 +212,18 @@ BEGIN_NAMESPACE_BUNDLE {
 
 	void SocketClientInternal::pushMessage(const Socketmessage* msg) {
 		this->_writeQueue.push_back((Socketmessage*)msg);
-		if (this->_threadClient) {
-			pthread_kill(this->_threadClient->native_handle(), SIGTERM);
+		if (this->_threadWorker) {
+			pthread_kill(this->_threadWorker->native_handle(), WAKE_PROCESS_SIGNAL);
 		}
 	}
 		
 	void SocketClientInternal::stop() {
 		if (!this->isstop()) {
 			this->_stop = true;
-			if (this->_threadClient) {
-				pthread_kill(this->_threadClient->native_handle(), SIGTERM);
-				if (this->_threadClient->joinable()) {
-					this->_threadClient->join();
+			if (this->_threadWorker) {
+				pthread_kill(this->_threadWorker->native_handle(), WAKE_PROCESS_SIGNAL);
+				if (this->_threadWorker->joinable()) {
+					this->_threadWorker->join();
 				}
 			}
 
@@ -259,7 +252,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			}
 
 			// destroy client thread
-			SafeDelete(this->_threadClient);
+			SafeDelete(this->_threadWorker);
 		}
 	}
 
