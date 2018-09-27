@@ -51,6 +51,7 @@ BEGIN_NAMESPACE_BUNDLE {
 				std::function<void(SlotProcess*, Socketmessage*)> broadcastMessage = nullptr;
 				std::function<void(SlotProcess*)> checkSocket = nullptr;
 				std::function<void(SlotProcess*)> acceptSocket = nullptr;
+				u32 id = -1;
 			};
 			LockfreeQueue<Socketmessage> _readQueue;
 			std::vector<SlotProcess*> _slotProcesses;
@@ -109,6 +110,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 		// make master process
 		SlotProcess* slot = new SlotProcess();
+		slot->id = 0; // master process id
 		memset(slot->sockets, 0, sizeof(slot->sockets));
 		slot->threadWorker = new std::thread([this](SlotProcess* slot) {
 				this->workerProcess(slot);
@@ -159,6 +161,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		// make worker process
 		for (u32 i = 0; i < this->_workerNumber; ++i) {
 			SlotProcess* slot = new SlotProcess();
+			slot->id = i + 1; // worker process id
 			memset(slot->sockets, 0, sizeof(slot->sockets));
 			slot->threadWorker = new std::thread([this](SlotProcess* slot) {
 				this->workerProcess(slot);
@@ -181,6 +184,7 @@ BEGIN_NAMESPACE_BUNDLE {
 						// get newmsg from Socket
 						//
 						this->_readQueue.push_back(newmsg);
+						Debug << "newmsg from slot: " << slot->id;
 					}
 					else {
 						return; }
@@ -223,6 +227,7 @@ BEGIN_NAMESPACE_BUNDLE {
 					// throw establish message
 					//
 					this->_readQueue.push_back(msg);
+					Debug << "establish connection: " << newfd << ", slot: " << slot->id;
 				}
 				else { // exceeding this maximum connections limit
 					::close(newfd); }
@@ -241,6 +246,7 @@ BEGIN_NAMESPACE_BUNDLE {
 				// throw close message
 				//
 				this->_readQueue.push_back(msg);
+				Debug << "lost connection: " << newfd << ", slot: " << slot->id;
 			};
 
 			slot->broadcastMessage = [this](SlotProcess* slot, Socketmessage* msg) {
@@ -299,6 +305,34 @@ BEGIN_NAMESPACE_BUNDLE {
 			};
 
 			slot->checkSocket = [this](SlotProcess* slot) {
+				if (this->_opts[BUNDLE_SOL_SILENCE_SECOND] > 0 || this->_opts[BUNDLE_SOL_THRESHOLD_MESSAGE] > 0) {
+					u64 nowtime = timeSecond();
+					for (SOCKET s = 0; s <= slot->maxfd; ++s) {
+						ASSERT_SOCKET(s);
+						Socket* so = slot->sockets[s];
+						if (!so) {
+							continue;
+						}
+				
+						if (this->_opts[BUNDLE_SOL_SILENCE_SECOND] > 0 && (nowtime - so->lastSecond()) >= this->_opts[BUNDLE_SOL_SILENCE_SECOND]) {
+							Alarm.cout("Connection:%d, No messages has been received in the last %ld seconds, allow: (%ld)", s, nowtime - so->lastSecond(), this->_opts[BUNDLE_SOL_SILENCE_SECOND]);
+							//
+							// silence time too long
+							//
+							slot->removeSocket(slot->s);
+						}
+						else if (this->_opts[BUNDLE_SOL_THRESHOLD_MESSAGE] > 0 && this->_opts[BUNDLE_SOL_THRESHOLD_INTERVAL] > 0) {
+							u32 total = so->recentMessage(this->_opts[BUNDLE_SOL_THRESHOLD_INTERVAL]);
+							if (total > this->_opts[BUNDLE_SOL_THRESHOLD_MESSAGE]) {
+								Alarm.cout("Connection:%d, More than %d(%ld) messages have been received in the last %ld seconds", s, total, this->_opts[BUNDLE_SOL_THRESHOLD_MESSAGE], this->_opts[BUNDLE_SOL_THRESHOLD_INTERVAL]);
+								//
+								// send message too fast
+								//
+								slot->removeSocket(slot->s);
+							}
+						}
+					}
+				}
 			};
 
 			slot->acceptSocket = [this](SlotProcess* slot) {
