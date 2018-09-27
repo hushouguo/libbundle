@@ -74,7 +74,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	bool SocketServerInternal::setWorkerNumber(u32 worker_number) {
 		CHECK_RETURN(this->_stop, false, "SockerServer is running, stop it at first!");
 		//CHECK_RETURN(worker_number > 0, false, "worker number must be greater than 0");
-		CHECK_RETURN(worker_number > std::thread::hardware_concurrency() * 8, false, 
+		CHECK_RETURN(worker_number < std::thread::hardware_concurrency() * 8, false, 
 		"woker number: %d too large, hardware: %d, suggest: %d", worker_number, std::thread::hardware_concurrency(), std::thread::hardware_concurrency() * 2);
 		this->_workerNumber = worker_number;
 		return true;
