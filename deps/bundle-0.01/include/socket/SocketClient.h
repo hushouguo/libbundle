@@ -22,7 +22,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	};
 
 	struct SocketClientCreator {
-		static SocketClient* create(std::function<int(const Byte*, size_t)> splitMessage);
+		static SocketClient* create(MESSAGE_SPLITER splitMessage);
 	};
 }
 

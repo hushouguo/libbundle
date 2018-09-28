@@ -217,6 +217,14 @@ using ssize_t	=						int;
 #define BUNDLE_INVALID_SOCKET			-1
 #define BUNDLE_BROADCAST_SOCKET			BUNDLE_INVALID_SOCKET
 
+//
+// return value:
+//	-1: error happen
+//	 0: incomplete package
+// > 0: package length
+//
+using MESSAGE_SPLITER	=				std::function<int(const void*, size_t)>;
+
 #if !defined(__cplusplus)
 using bool		= 						int;
 #define true							1

@@ -11,7 +11,7 @@
 BEGIN_NAMESPACE_BUNDLE {
 	class Socket {
 		public:
-			Socket(SOCKET connfd, std::function<int(const Byte*, size_t)> splitMessage) : _fd(connfd) {
+			Socket(SOCKET connfd, MESSAGE_SPLITER splitMessage) : _fd(connfd) {
 				nonblocking(this->fd());
 				this->_splitMessage = splitMessage;
 			}
@@ -43,7 +43,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			bool _is_listening = false;
 			ByteBuffer _rbuffer, _wbuffer;
 			std::list<const Socketmessage*> _sendlist;
-			std::function<int(const Byte*, size_t)> _splitMessage = nullptr;
+			MESSAGE_SPLITER _splitMessage = nullptr;
 			bool splitMessage(Socketmessage*& msg);
 			
 			u64 _lastSecond = timeSecond();

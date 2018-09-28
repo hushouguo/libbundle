@@ -3,13 +3,16 @@
  * \brief: Created by hushouguo at 05:42:03 Sep 22 2018
  */
 
+#define GET_SOCKET(S) ({ ASSERT_SOCKET(S); this->_sockets[S]; })
+
 BEGIN_NAMESPACE_BUNDLE {
-	WorkerProcess::WorkerProcess(u32 id, LockfreeQueue<Socketmessage*>* recvQueue) 
+	WorkerProcess::WorkerProcess(u32 id, MESSAGE_SPLITER splitMessage, LockfreeQueue<Socketmessage*>* recvQueue) 
 		: Entry<u32>(id) {
 		memset(this->_sockets, 0, sizeof(this->_sockets));
 		this->_threadWorker = new std::thread([this]() {
-				this->proceed();
+				this->run();
 				});
+		this->_splitMessage = splitMessage;
 		this->_recvQueue = recvQueue;
 	}
 
@@ -30,12 +33,6 @@ BEGIN_NAMESPACE_BUNDLE {
 			// destroy worker thread
 			SafeDelete(this->_threadWorker);
 		
-			// close connfd
-			while (!this->_fdsQueue.empty()) {
-				SOCKET s = this->_fdsQueue.pop_front();
-				::close(s);
-			}
-
 			// release Socket object
 			for (auto& so : this->_sockets) {
 				SafeDelete(so);
@@ -46,12 +43,15 @@ BEGIN_NAMESPACE_BUNDLE {
 				const Socketmessage* msg = this->_sendQueue.pop_front();
 				assert(msg);
 				assert(msg->magic == MAGIC);
+				if (msg->opcode == SM_OPCODE_NEW_SOCKET) {
+					::close(msg->s);
+				}
 				bundle::releaseMessage(msg);
 			}
 		}
 	}
 
-	void WorkerProcess::proceed() {
+	void WorkerProcess::run() {
 		setSignal(WAKE_WORKER_PROCESS_SIGNAL);
 		while (!this->isstop()) {
 			this->checkSocket();
@@ -60,57 +60,158 @@ BEGIN_NAMESPACE_BUNDLE {
 			this->poll.run(-1, this->readSocket, this->writeSocket, this->errorSocket);
 		}
 		Debug << "WorkerProcess: " << this->id << " thread exit, maxfd: " << this->_maxfd 
-			<< ", writeQueue: " << this->_writeQueue.size() << ", fdsQueue: " << this->_fdsQueue.size();
+			<< ", recvQueue: " << this->_recvQueue->size() << ", sendQueue: " << this->_sendQueue.size();
 	}
 
-	void WorkerProcess::addSocket(SOCKET newfd, bool is_listening) {
-		ASSERT_SOCKET(newfd);
-		Socket* so = new Socket(newfd, this->_splitMessage);//TODO:
-		so->set_listening(is_listening);
-		this->addSocket(so, false);
-	}
-
-	void WorkProcess::addSocket(Socket* so, bool spread) {
-		assert(so);
-		ASSERT_SOCKET(so->fd());
-		assert(this->_sockets[so->fd()] == nullptr);
-		this->_sockets[so->fd()] = so;
-		this->_poll.addSocket(so->fd());
-		if (so->fd() > this->_maxfd) { this->_maxfd = so->fd(); }i
-		if (spread) {
-			Socketmessage* msg = allocateMessage(so->fd(), SM_OPCODE_ESTABLISH);
-			//
-			// throw establish message
-			//
-			this->_recvQueue->push_back(msg);
+	void WorkerProcess::pushMessage(Socketmessage* msg) {
+		this->_sendQueue.push_back(msg);
+		if (this->_threadWorker) {
+			pthread_kill(this->_threadWorker->native_handle(), WAKE_WORKER_PROCESS_SIGNAL);
 		}
-		Debug << "establish connection: " << so->fd() << ", slot: " << this->id;
 	}
 
-	void WorkerProcess::removeSocket(SOCKET s) {
-		ASSERT_SOCKET(s);
-		Socket* so = this->_sockets[s];
-		//assert(so != nullptr);
+	void WorkerProcess::addSocket(SOCKET s, bool is_listening) {
+		Socketmessage* msg = allocateMessage(s, is_listening ? SM_OPCODE_NEW_LISTENING : SM_OPCODE_NEW_SOCKET);
+		this->pushMessage(msg);
+	}
+	
+	void WorkerProcess::closeSocket(SOCKET s) {
+		Socketmessage* msg = allocateMessage(s, SM_OPCODE_CLOSE);
+		this->pushMessage(msg);
+	}
+	
+	void WorkerProcess::pushMessage(SOCKET s, Socketmessage* msg) {
+		msg->s = s;
+		this->pushMessage(msg);
+	}
+
+	void WorkerProcess::pushMessage(SOCKET s, const void* payload, size_t payload_len) {
+		assert(payload);
+		assert(payload_len > 0);
+		Socketmessage* msg = allocateMessage(s, SM_OPCODE_MESSAGE, payload, payload_len);
+		this->pushMessage(msg);	
+	}
+	
+	void WorkerProcess::readSocket(SOCKET s) {
+		Socket* so = GET_SOCKET(s);
+		CHECK_RETURN(so, void(0), "readSocket: %d, not found Socket", s);
+		if (so->is_listening()) {
+			this->acceptSocket(so);	
+		}
+		else {
+			this->readSocket(so);
+		}
+	}
+	
+	void WorkerProcess::acceptSocket(Socket* so) {
+		assert(so);
+		assert(so->is_listening());
+		while (!this->isstop()) {
+			struct sockaddr_in addr;
+			socklen_t len = sizeof(addr);
+			SOCKET newfd = ::accept(so->fd(), (struct sockaddr*)&addr, &len);
+			if (newfd < 0) {
+				if (interrupted()) {
+					continue;
+				}
+				if (wouldblock()) {
+					break; // no more connection
+				}
+				CHECK_RETURN(false, void(0), "accept error:%d,%s", errno, strerror(errno));
+			}
+			ASSERT_SOCKET(newfd);
+
+			//
+			// get newfd from Socket
+			//
+			Socketmessage* msg = allocateMessage(newfd, SM_OPCODE_NEW_SOCKET);
+			this->_recvQueue.push_back(msg);
+		}
+	}
+
+	void WorkerProcess::readSocket(Socket* so) {
+		assert(so);
+		assert(!so->is_listening());
+		while (!this->isstop()) {
+			Socketmessage* newmsg = nullptr;
+			if (!so->receiveMessage(newmsg)) {
+				//
+				// read socket error happen
+				//
+				this->removeSocket(so->fd(), "readSocket error");
+				return;
+			}
+			if (newmsg) {
+				//
+				// get newmsg from Socket
+				//
+				this->_recvQueue.push_back(newmsg);
+			}
+			else {
+				return; }
+		}			
+	}
+
+	void WorkerProcess::writeSocket(SOCKET s) {
+		Socket* so = GET_SOCKET(s);
+		CHECK_RETURN(so, void(0), "writeSocket: %d, not found Socket", s);
+		CHECK_RETURN(!so->is_listening(), void(0), "writeSocket: %d is listening", s);
+		if (!so->sendMessage()) {
+			//
+			// write socket error happen
+			//
+			this->removeSocket(s, "writeSocket error");
+		}
+	}
+
+	void WorkerProcess::errorSocket(SOCKET s) {
+		Socket* so = GET_SOCKET(s);
+		CHECK_RETURN(so, void(0), "errorSocket: %d, not found Socket", s);
+		this->removeSocket(s, "errorSocket");
+	}
+
+
+	//========================================================================================
+	//
+	void WorkerProcess::newSocket(SOCKET newfd, bool is_listening) {
+		Socket* so = GET_SOCKET(newfd);
+		assert(so == nullptr);		
+		this->_sockets[newfd] = so = new Socket(newfd, this->_splitMessage);		
+		so->set_listening(is_listening);
+		this->_poll.addSocket(newfd);
+		if (newfd > this->_maxfd) { this->_maxfd = newfd; }
+		Socketmessage* msg = allocateMessage(newfd, SM_OPCODE_ESTABLISH);
+		//
+		// throw establish message
+		//
+		this->_recvQueue->push_back(msg);
+		++_totalConnections;
+		Debug << "establish connection: " << newfd << ", worker: " << this->id;
+	}
+
+	void WorkerProcess::removeSocket(SOCKET s, const char* reason) {
+		Socket* so = GET_SOCKET(s);
 		CHECK_ALARM(so != nullptr, "socket: %d not exist", s);
-		this->_poll.removeSocket(s);
 		this->_sockets[s] = nullptr;
 		SafeDelete(so);
+		this->_poll.removeSocket(s);
 		Socketmessage* msg = allocateMessage(s, SM_OPCODE_CLOSE);
 		//
 		// throw close message
 		//
 		this->_recvQueue.push_back(msg);
-		Debug << "lost connection: " << s << ", slot: " << this->id;
+		assert(_totalConnections > 0);
+		--_totalConnections;
+		Debug << "lost connection: " << s << ", worker: " << this->id << ", reason: " << reason;
 	}
 
 	void WorkerProcess::sendMessage(SOCKET s, Socketmessage* msg) {
-		ASSERT_SOCKET(s);
-		Socket* so = this->_sockets[s];
+		Socket* so = GET_SOCKET(s);
 		if (so && !so->sendMessage(msg)) {
 			//
 			// send message to socket error
 			//
-			this->removeSocket(s);
+			this->removeSocket(s, "sendMessage");
 		}
 	}
 
@@ -146,23 +247,22 @@ BEGIN_NAMESPACE_BUNDLE {
 
 	void WorkerProcess::handleMessage() {
 		while (!this->_sendQueue.empty()) {
-			Socketmessage* msg = slot->_sendQueue.pop_front();
+			Socketmessage* msg = this->_sendQueue.pop_front();
 			assert(msg);
 			assert(msg->magic == MAGIC);
 			if (msg->s == BUNDLE_BROADCAST_SOCKET) {
 				this->multisendMessage(msg);
 			}
 			else {
-				ASSERT_SOCKET(msg->s);
 				switch (msg->opcode) {
 					case SM_OPCODE_CLOSE: 
-						this->removeSocket(msg->s);
+						this->removeSocket(msg->s, "active");
 						bundle::releaseMessage(msg);
 						break;
 
 					case SM_OPCODE_MESSAGE: 
 						if (true) {
-							Socket* so = this->_sockets[msg->s];
+							Socket* so = GET_SOCKET(msg->s);
 							if (!so) {
 								//
 								// socket maybe already be closed
@@ -175,108 +275,20 @@ BEGIN_NAMESPACE_BUNDLE {
 						}
 						break;
 
-					case SM_OPCODE_ESTABLISH:
-						this->addSocket(msg->s);
+					case SM_OPCODE_NEW_SOCKET:
+						this->newSocket(msg->s, false);
 						bundle::releaseMessage(msg);
 						break;
 
-					default: assert(false); break;
+					case SM_OPCODE_NEW_LISTENING:
+						this->newSocket(msg->s, true);
+						bundle::releaseMessage(msg);
+						break;
+						
+					default:
+					case SM_OPCODE_ESTABLISH: assert(false); break;
 				}					
 			}
 		}
-	}
-
-	void WorkerProcess::readSocket(SOCKET s) {
-		ASSERT_SOCKET(s);
-		Socket* so = this->_sockets[s];
-		assert(so != nullptr);
-		if (so->is_listening()) {
-			this->acceptSocket(so);	
-		}
-		else {
-			this->readSocket(so);
-		}
-	}
-	
-	void WorkerProcess::acceptSocket(Socket* so) {
-		assert(so);
-		assert(so->is_listening());
-		while (!this->isstop()) {
-			struct sockaddr_in addr;
-			socklen_t len = sizeof(addr);
-			SOCKET newfd = ::accept(so->fd(), (struct sockaddr*)&addr, &len);
-			if (newfd < 0) {
-				if (interrupted()) {
-					continue;
-				}
-				if (wouldblock()) {
-					break; // no more connection
-				}
-				CHECK_RETURN(false, void(0), "accept error:%d,%s", errno, strerror(errno));
-			}
-			ASSERT_SOCKET(newfd);
-			WorkerProcess* workerProcess = this->getWorkerProcess(newfd); // TODO:
-
-			//TODO:
-			workerProcess->addSocket(newfd, false);
-
-			SlotProcess* slot_worker = this->getWorkerProcess(newfd);
-			if (slot_worker == slot) {
-				slot_worker->fdslist.push_back(newfd);
-			}
-			else {
-				slot_worker->fdslocker.lock();
-				slot_worker->fdslist.push_back(newfd);
-				slot_worker->fdslocker.unlock();
-				if (slot_worker->threadWorker) {
-					pthread_kill(slot_worker->threadWorker->native_handle(), WAKE_WORKER_PROCESS_SIGNAL);
-				}
-			}
-		}
-	}
-
-	void WorkerProcess::readSocket(Socket* so) {
-		assert(so);
-		assert(!so->is_listening());
-		while (!this->isstop()) {
-			Socketmessage* newmsg = nullptr;
-			if (!so->receiveMessage(newmsg)) {
-				//
-				// read socket error
-				//
-				this->removeSocket(so->fd());
-				return;
-			}
-			if (newmsg) {
-				//
-				// get newmsg from Socket
-				//
-				this->_recvQueue.push_back(newmsg);
-				Debug << "newmsg from slot: " << this->id;
-			}
-			else {
-				return; }
-		}			
-	}
-
-	void WorkerProcess::writeSocket(SOCKET s) {
-		ASSERT_SOCKET(s);
-		Socket* so = this->_sockets[s];
-		assert(so != nullptr);
-		//assert(!so->is_listening());
-		CHECK_RETURN(!so->is_listening(), void(0), "socket: %d is listening", s);
-		if (!so->is_listening() && !so->sendMessage()) {
-			//
-			// write socket error
-			//
-			thist->removeSocket(s);
-		}
-	}
-
-	void WorkerProcess::errorSocket(SOCKET s) {
-		ASSERT_SOCKET(s);
-		Socket* so = this->_sockets[s];
-		assert(so != nullptr);
-		this->removeSocket(s);
 	}
 }

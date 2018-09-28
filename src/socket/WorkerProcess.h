@@ -18,11 +18,14 @@ BEGIN_NAMESPACE_BUNDLE {
 			void errorSocket(SOCKET);
 
 			void addSocket(SOCKET, bool is_listening = false);
-			inline bool isstop() { return this->_stop; }
-			void stop();
+			void closeSocket(SOCKET);
+			void pushMessage(SOCKET, Socketmessage*);
+			void pushMessage(SOCKET, const void*, size_t);
 
+			inline size_t totalConnections() { return this->_totalConnections; }
+			
 		public:
-			WorkerProcess(u32 id, LockfreeQueue<Socketmessage*>* recvQueue);
+			WorkerProcess(u32 id, MESSAGE_SPLITER splitMessage, LockfreeQueue<Socketmessage*>* recvQueue);
 			~WorkerProcess();
 
 		private:
@@ -31,12 +34,16 @@ BEGIN_NAMESPACE_BUNDLE {
 			SOCKET _maxfd = BUNDLE_INVALID_SOCKET;
 			std::thread* _threadWorker = nullptr;
 			LockfreeQueue<Socketmessage*> _sendQueue, *_recvQueue = nullptr;
-			LockfreeQueue<SOCKET> _fdsQueue;
 			bool _stop = false;
+			inline bool isstop() { return this->_stop; }
+			void stop();
+			MESSAGE_SPLITER _splitMessage = nullptr;
+			size_t _totalConnections = 0;
 
-			void proceed();
-			void addSocket(Socket*, bool spread = true);
-			void removeSocket(SOCKET);
+			void run();
+			void pushMessage(Socketmessage*);
+			void newSocket(SOCKET, bool is_listening);
+			void removeSocket(SOCKET, const char*);
 			void sendMessage(SOCKET, Socketmessage*);
 			void multisendMessage(Socketmessage*);
 			void checkSocket();

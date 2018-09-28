@@ -15,7 +15,7 @@
 BEGIN_NAMESPACE_BUNDLE {
 	class SocketClientInternal : public SocketClient {
 		public:
-			SocketClientInternal(std::function<int(const Byte*, size_t)> splitMessage);
+			SocketClientInternal(MESSAGE_SPLITER splitMessage);
 			~SocketClientInternal();
 
 		public:
@@ -29,25 +29,20 @@ BEGIN_NAMESPACE_BUNDLE {
 			void sendMessage(const void* payload, size_t payload_len) override;
 			void sendMessage(const Socketmessage*) override;
 
-		public:
-			void workerProcess();
-			
 		private:
-			std::thread* _threadWorker = nullptr;
+			WorkerProcess* _slotWorker = nullptr;
+			LockfreeQueue<Socketmessage> _readQueue; 
 			
 			SOCKET _fd = BUNDLE_INVALID_SOCKET;
 			bool _stop = true, _active = false;
 			
 			bool _connect_in_progress = false;
 			std::string _address;
-			int _port = 0;
-			
-			LockfreeQueue<Socketmessage> _readQueue, _writeQueue; 
+			int _port = 0;			
 
 			bool connectServer();
-			void pushMessage(const Socketmessage* msg);
 
-			std::function<int(const Byte*, size_t)> _splitMessage = nullptr;
+			MESSAGE_SPLITER _splitMessage = nullptr;
 	};
 
 	bool SocketClientInternal::connectServer() {
@@ -67,6 +62,8 @@ BEGIN_NAMESPACE_BUNDLE {
 		if (!rc) {
 			return false;
 		}
+
+		this->_slotWorker->addSocket(this->fd(), false);
 				
 		Debug.cout("SocketClient establish with %s:%d", this->_address.c_str(), this->_port);
 		
@@ -85,74 +82,15 @@ BEGIN_NAMESPACE_BUNDLE {
 			return false;
 		}
 		
-		SafeDelete(this->_threadWorker);
-		this->_threadWorker = new std::thread([this]() {
-			this->workerProcess();
-		});
-		std::this_thread::yield();
+		//SafeDelete(this->_slotWorker);
+		//this->_slotWorker = new WorkerProcess(0, this->_splitMessage, &this->_readQueue);
+		//std::this_thread::yield();
 		
 		return true;
 	}
 
+#if 0
 	void SocketClientInternal::workerProcess() {
-		setSignal(WAKE_PROCESS_SIGNAL);
-
-		Poll poll;
-		Socket* so = nullptr;
-
-		auto getSocket = [&](SOCKET s) -> Socket* {
-			assert(s == this->fd() && s != BUNDLE_INVALID_SOCKET);
-			return so;
-		};
-
-		auto pushMessage = [&](Socketmessage* msg) {
-			this->_readQueue.push_back(msg);
-		};
-
-		auto addSocket = [&](SOCKET s) {
-			if (!so || s != so->fd()) {
-				SafeDelete(so);// discard all unsent messages!
-				so = new Socket(s, this->_splitMessage);
-				poll.addSocket(s);
-				Socketmessage* msg = allocateMessage(s, SM_OPCODE_ESTABLISH);
-				pushMessage(msg);
-			}
-		};
-
-		auto removeSocket = [&](SOCKET s) {
-			Socketmessage* msg = allocateMessage(s, SM_OPCODE_CLOSE);
-			pushMessage(msg);
-			poll.removeSocket(s);
-			SafeDelete(so);
-			this->_active = false;
-		};
-		
-		auto readSocket = [&](SOCKET s) {
-			Socket* so = getSocket(s);
-			while (!this->isstop() && so) {
-				Socketmessage* msg = nullptr;
-				if (!so->receiveMessage(msg)) {
-					removeSocket(s);
-					return;
-				}
-				if (!msg) {	return; }
-				pushMessage(msg);
-			}
-		};
-
-		auto writeSocket = [&](SOCKET s) {
-			Socket* so = getSocket(s);
-			if (so && !so->sendMessage()) {
-				removeSocket(s);
-			}
-		};
-
-		auto writeMessage = [&](SOCKET s, const Socketmessage* msg) {
-			Socket* so = getSocket(s);
-			if (so && !so->sendMessage(msg)) {
-				removeSocket(s);
-			}
-		};
 
 		while (!this->isstop()) {
 			if (!this->active()) {
@@ -180,65 +118,46 @@ BEGIN_NAMESPACE_BUNDLE {
 		SafeDelete(so);
 		Debug << "clientProcess exit, readQueue: " << this->_readQueue.size() << ", writeQueue: " << this->_writeQueue.size();
 	}
+#endif
 
 	//////////////////////////////////////////////////////////////////////////////////
 	
 	const Socketmessage* SocketClientInternal::receiveMessage(bool& establish, bool& close) {
 		establish = close = false;
-		const Socketmessage* msg = this->_readQueue.pop_front();
-		if (msg) {
+		while (!this->_readQueue.empty()) {
+			const Socketmessage* msg = this->_readQueue.pop_front();
+			assert(msg);
 			assert(msg->magic == MAGIC);
+			assert(msg->s != BUNDLE_INVALID_SOCKET);
 			switch (msg->opcode) {
-				case SM_OPCODE_ESTABLISH: establish = true; break;
-				case SM_OPCODE_CLOSE: close = true; break;
-				case SM_OPCODE_MESSAGE: break;
-				default: assert(false); break;
+				case SM_OPCODE_ESTABLISH: establish = true; return msg;
+				case SM_OPCODE_CLOSE: close = true; return msg;
+				case SM_OPCODE_MESSAGE: return msg;
+
+				default:
+				case SM_OPCODE_NEW_SOCKET:
+				case SM_OPCODE_NEW_LISTENING: assert(false); break;
 			}
 		}
-		return msg;
+		return nullptr;
 	}
 
 	void SocketClientInternal::sendMessage(const void* payload, size_t payload_len) {
-		assert(payload);
-		assert(payload_len > 0);
-		Socketmessage* msg = allocateMessage(this->fd(), SM_OPCODE_MESSAGE, payload, payload_len);
-		this->pushMessage(msg);
+		this->_slotWorker->pushMessage(this->fd(), payload, payload_len);
 	}
 	
 	void SocketClientInternal::sendMessage(const Socketmessage* msg) {
-		((Socketmessage*)msg)->s = this->fd();
-		this->pushMessage(msg);
+		this->_slotWorker->pushMessage(this->fd(), msg);
 	}
 
-	void SocketClientInternal::pushMessage(const Socketmessage* msg) {
-		this->_writeQueue.push_back((Socketmessage*)msg);
-		if (this->_threadWorker) {
-			pthread_kill(this->_threadWorker->native_handle(), WAKE_PROCESS_SIGNAL);
-		}
-	}
-		
 	void SocketClientInternal::stop() {
 		if (!this->isstop()) {
 			this->_stop = true;
-			if (this->_threadWorker) {
-				pthread_kill(this->_threadWorker->native_handle(), WAKE_PROCESS_SIGNAL);
-				if (this->_threadWorker->joinable()) {
-					this->_threadWorker->join();
-				}
-			}
+			SafeDelete(this->_slotWorker);
 
 			// release readQueue messages
 			for (;;) {
 				Socketmessage* msg = this->_readQueue.pop_front();
-				if (!msg) {
-					break;
-				}
-				bundle::releaseMessage(msg);
-			}
-
-			// release writeQueue messages
-			for (;;) {
-				Socketmessage* msg = this->_writeQueue.pop_front();
 				if (!msg) {
 					break;
 				}
@@ -250,9 +169,6 @@ BEGIN_NAMESPACE_BUNDLE {
 				::close(this->_fd);
 				this->_fd = BUNDLE_INVALID_SOCKET;
 			}
-
-			// destroy client thread
-			SafeDelete(this->_threadWorker);
 		}
 	}
 
@@ -260,8 +176,9 @@ BEGIN_NAMESPACE_BUNDLE {
 		return this->_active;
 	}
 
-	SocketClientInternal::SocketClientInternal(std::function<int(const Byte*, size_t)> splitMessage) {
+	SocketClientInternal::SocketClientInternal(MESSAGE_SPLITER splitMessage) {
 		this->_splitMessage = splitMessage;
+		this->_slotWorker = new WorkerProcess(0, splitMessage, &this->_readQueue);
 	}
 	
 	SocketClient::~SocketClient() {}
@@ -269,7 +186,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		this->stop(); 
 	}
 
-	SocketClient* SocketClientCreator::create(std::function<int(const Byte*, size_t)> splitMessage) {
+	SocketClient* SocketClientCreator::create(MESSAGE_SPLITER splitMessage) {
 		return new SocketClientInternal(splitMessage);
 	}
 }
