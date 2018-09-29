@@ -21,7 +21,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 		public:
 			SOCKET fd() override {	return this->_fd; }
-			bool connect(const char* address, int port, bool wait) override;
+			bool connect(const char* address, int port, u32 timeout) override;
 			void stop() override;
 			inline bool isstop() { return this->_stop; }
 			bool active() override;
@@ -39,87 +39,76 @@ BEGIN_NAMESPACE_BUNDLE {
 			
 			bool _connect_in_progress = false;
 			std::string _address;
-			int _port = 0;			
+			int _port = 0;
+			std::thread* _retry_thread = nullptr;
 
-			bool connectServer();
+			bool connectServer(u32 timeout);
+			bool connectAsync();
 
 			MESSAGE_SPLITER _splitMessage = nullptr;
 	};
 
-	bool SocketClientInternal::connectServer() {
-		CHECK_RETURN(this->active() == false, true, "connection already establish");
-		CHECK_RETURN(this->connect_in_progress() == false, false, "connect in progress");
+	bool SocketClientInternal::connectServer(u32 timeout) {
+		CHECK_RETURN(this->active() == false, true, "connectServer already establish");
+		CHECK_RETURN(this->connect_in_progress() == false, false, "connectServer in progress");
 		this->_connect_in_progress = true;
 		
-		if (this->_fd != BUNDLE_INVALID_SOCKET) {
-			::close(this->_fd);
-			this->_fd = BUNDLE_INVALID_SOCKET;
-		}
 		this->_fd = ::socket(AF_INET, SOCK_STREAM, 0);
 		CHECK_RETURN(this->_fd >= 0, false, "create socket failure: %d, %s", errno, strerror(errno));
 		
-		bool rc = connectSignal(this->fd(), this->_address.c_str(), this->_port, CONNECT_TIMEOUT);
+		bool rc = connectSignal(this->fd(), this->_address.c_str(), this->_port, timeout);
 		this->_connect_in_progress = false;
 		if (!rc) {
 			return false;
 		}
 
-		this->_slotWorker->addSocket(this->fd(), false);
-				
 		Debug.cout("SocketClient establish with %s:%d", this->_address.c_str(), this->_port);
 		
-		return this->_active = true;
+		return true;
 	}
 	
-	bool SocketClientInternal::connect(const char* address, int port, bool wait) {
+	bool SocketClientInternal::connect(const char* address, int port, u32 timeout) {
 		CHECK_RETURN(this->_stop, false, "SocketClient is running, stop it at first!");
 		this->_stop = false;
 		CHECK_RETURN(this->_active == false, false, "SocketClient is active, stop it at first!");
 		this->_active = false;
 		this->_address = address;
 		this->_port = port;
-
-		if (wait && !this->connectServer()) {
-			return false;
+		
+		if (timeout > 0) {
+			this->_active = this->connectServer(timeout);
+			if (this->_active) {
+				this->_slotWorker->addSocket(this->fd(), false);
+			}
+			return this->_active;
 		}
 		
-		//SafeDelete(this->_slotWorker);
-		//this->_slotWorker = new WorkerProcess(0, this->_splitMessage, &this->_readQueue);
-		//std::this_thread::yield();
-		
+		return this->connectAsync();
+	}
+
+	bool SocketClientInternal::connectAsync() {
+		CHECK_RETURN(this->active() == false, true, "connectAsync already establish");
+		CHECK_RETURN(this->connect_in_progress() == false, false, "connectAsync in progress");
+		this->_connect_in_progress = true;
+		SafeDelete(this->_retry_thread);
+		this->_retry_thread = new std::thread([this]() {
+			for (; !this->isstop() && !this->active(); ) {
+				if (this->_fd != BUNDLE_INVALID_SOCKET) {
+					::close(this->_fd);
+					this->_fd = BUNDLE_INVALID_SOCKET;
+				}
+				::sleep(CONNECT_INTERVAL);
+				if (this->connectServer(CONNECT_TIMEOUT)) {
+					this->_active = true;
+				}
+			}			
+			this->_connect_in_progress = false;
+			if (this->active()) {
+				this->_slotWorker->addSocket(this->fd(), false);
+			}
+		});	
 		return true;
 	}
-
-#if 0
-	void SocketClientInternal::workerProcess() {
-
-		while (!this->isstop()) {
-			if (!this->active()) {
-				if (this->fd() != BUNDLE_INVALID_SOCKET) {	::sleep(CONNECT_INTERVAL); }
-				if (!this->connectServer()) {
-					continue;
-				}
-			}
-			else {
-				addSocket(this->fd());
-				while (this->_writeQueue.size() > 0) {
-					const Socketmessage* msg = this->_writeQueue.pop_front();
-					assert(msg->magic == MAGIC);
-					if (!getSocket(msg->s)) {
-						bundle::releaseMessage(msg);
-					}
-					else {
-						writeMessage(msg->s, msg);
-					}
-				}
-				poll.run(-1, readSocket, writeSocket, removeSocket);
-			}
-		}
-
-		SafeDelete(so);
-		Debug << "clientProcess exit, readQueue: " << this->_readQueue.size() << ", writeQueue: " << this->_writeQueue.size();
-	}
-#endif
 
 	//////////////////////////////////////////////////////////////////////////////////
 	
@@ -132,7 +121,13 @@ BEGIN_NAMESPACE_BUNDLE {
 			assert(msg->s != BUNDLE_INVALID_SOCKET);
 			switch (msg->opcode) {
 				case SM_OPCODE_ESTABLISH: establish = true; return msg;
-				case SM_OPCODE_CLOSE: close = true; return msg;
+				case SM_OPCODE_CLOSE:
+					if (msg->s == this->fd()) {
+						Debug << "SocketClient: " << this->fd() << " lost, retry connect";
+						this->_active = false;
+						this->connectAsync();
+					}
+					close = true; return msg;
 				case SM_OPCODE_MESSAGE: return msg;
 
 				default:
@@ -168,6 +163,9 @@ BEGIN_NAMESPACE_BUNDLE {
 				::close(this->_fd);
 				this->_fd = BUNDLE_INVALID_SOCKET;
 			}
+
+			// release retry thread
+			SafeDelete(this->_retry_thread);
 		}
 	}
 
@@ -177,7 +175,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 	SocketClientInternal::SocketClientInternal(MESSAGE_SPLITER splitMessage) {
 		this->_splitMessage = splitMessage;
-		this->_slotWorker = new WorkerProcess(0, splitMessage, &this->_readQueue);
+		this->_slotWorker = new WorkerProcess(0, this->_splitMessage, &this->_readQueue);
 	}
 	
 	SocketClient::~SocketClient() {}

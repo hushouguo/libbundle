@@ -13,7 +13,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			
 		public:
 			virtual SOCKET fd() = 0;
-			virtual bool connect(const char* address, int port, bool wait) = 0;
+			virtual bool connect(const char* address, int port, u32 timeout) = 0;
 			virtual void stop() = 0;
 			virtual bool active() = 0;
 			virtual const Socketmessage* receiveMessage(bool& establish, bool& close) = 0;
