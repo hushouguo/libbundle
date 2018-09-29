@@ -6,19 +6,8 @@
 #include "global.h"
 
 int main(int argc, char* argv[]) {
-	if (!sConfig.init(argc, argv)) { return 1; }
-
-	Easylog::syslog()->set_level((EasylogSeverityLevel) sConfig.get("log.level", GLOBAL));
-	Easylog::syslog()->set_autosplit_day(sConfig.get("log.autosplit_day", true));
-	Easylog::syslog()->set_autosplit_hour(sConfig.get("log.autosplit_hour", false));
-	Easylog::syslog()->set_destination(sConfig.get("log.dir", ".logs"));
-	Easylog::syslog()->set_tofile(GLOBAL, "gatewayserver");
-	Easylog::syslog()->set_tostdout(GLOBAL, sConfig.runasdaemon ? false : true);
+	if (!init_runtime_environment(argc, argv)) { return 1; }
 	
-	// Verify that the version of the library that we linked against is
-	// compatible with the version of the headers we compiled against.
-	GOOGLE_PROTOBUF_VERIFY_VERSION;
-
 	//CHECK_GOTO(sCentralClient.init(), exit_except, "CentralClient init failure");
 	CHECK_GOTO(sGatewayService.init(), exit_except, "GatewayService init failure");
 	
@@ -37,13 +26,8 @@ int main(int argc, char* argv[]) {
 	}
 
 exit_except:
-
 	sCentralClient.stop();
 	sGatewayService.stop();
-	Easylog::syslog()->stop();
-	
-	// Optional:  Delete all global objects allocated by libprotobuf.
-	google::protobuf::ShutdownProtobufLibrary();
-	
+	shutdown_bundle_library();
 	return 0;	
 }

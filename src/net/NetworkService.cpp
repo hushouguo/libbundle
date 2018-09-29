@@ -90,7 +90,6 @@ BEGIN_NAMESPACE_BUNDLE {
 			this->_socketServer->setsockopt(BUNDLE_SOL_THRESHOLD_MESSAGE, &threshold_message, sizeof(threshold_message));
 		}
 
-		setup_runtime_environment();
 		Trace.cout("NetworkService listening on %s:%d", address, port);
 		return true;
 	}
@@ -164,108 +163,6 @@ BEGIN_NAMESPACE_BUNDLE {
 				this->_socketServer->stop();
 			}
 		}
-	}
-
-	void NetworkService::setup_runtime_environment() {
-		this->init_signal();
-		size_t stack_size = sConfig.get("limit.stack_size", 0u);
-		if (stack_size > 0) {
-			setStackSizeLimit(stack_size);
-		}
-
-		size_t max_files = sConfig.get("limit.max_files", 0u);
-		if (max_files > 0) {
-			setOpenFilesLimit(max_files);
-		}
-
-		Trace << "StackSize: " << getStackSizeLimit() << ", MaxOpenFiles: " << getOpenFilesLimit();
-
-		u32 shard = sConfig.get("shard.id", 0u);
-		if (shard > 0) {
-			Trace << "shard: " << shard;
-		}
-		else {
-			Trace << "shard: not configured";
-		}
-
-		Trace << "all 3rd libraries:";
-		Trace.cout("    libbundle: %d.%d.%d", BUNDLE_VERSION_MAJOR, BUNDLE_VERSION_MINOR, BUNDLE_VERSION_PATCH);
-
-#ifdef TC_VERSION_MAJOR		
-		Trace.cout("    tcmalloc: %d.%d%s", TC_VERSION_MAJOR, TC_VERSION_MINOR, TC_VERSION_PATCH);
-#else
-		Trace.cout("    not link tcmalloc");
-#endif
-
-#ifdef LIBEVENT_VERSION
-		Trace.cout("    libevent: %s", LIBEVENT_VERSION);
-#endif
-
-#ifdef ZMQ_VERSION_MAJOR
-		Trace.cout("    libzmq: %d.%d.%d", ZMQ_VERSION_MAJOR, ZMQ_VERSION_MINOR, ZMQ_VERSION_PATCH);
-#endif
-
-#ifdef LUAJIT_VERSION
-		Trace.cout("    luaJIT: %s -- %s", LUAJIT_VERSION, LUAJIT_COPYRIGHT);
-#endif
-
-#ifdef GOOGLE_PROTOBUF_VERSION
-		Trace.cout("    protobuf: %d, library: %d", GOOGLE_PROTOBUF_VERSION, GOOGLE_PROTOBUF_MIN_LIBRARY_VERSION);
-#endif
-
-		Trace.cout("    rapidxml: 1.13");
-
-#ifdef MYSQL_SERVER_VERSION		
-		Trace.cout("    mysql: %s", MYSQL_SERVER_VERSION);
-#endif
-
-		Trace.cout("    gcc version: %d.%d.%d", __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__);
-	}
-
-	void NetworkService::init_signal() {
-		struct sigaction act;
-		/*signal(SIGHUP, SIG_IGN);*/
-		signal(SIGPIPE, SIG_IGN);
-		/* When the SA_SIGINFO flag is set in sa_flags then sa_sigaction is used.
-		 * Otherwise, sa_handler is used. */
-		sigemptyset(&act.sa_mask);
-		act.sa_flags = 0;
-		act.sa_handler = [](int sig) {
-			//Alarm << "receive signal: " << sig;
-			fprintf(stderr, "receive signal: %d\n", sig);
-			switch (sig) {
-				case SIGHUP:
-					// reload configure
-					break;
-
-				case SIGINT:
-				case SIGTERM:
-				case SIGQUIT:				
-					sConfig.syshalt();	
-					Alarm << "system is being shutdown ..."; 
-					break;
-
-				case SIGUSR1:
-#ifdef TC_VERSION_MAJOR				
-					if (true) {
-						struct mallinfo info = tc_mallinfo();
-						System << "total allocated space: " << info.uordblks << " bytes";
-						if (!sConfig.runasdaemon) {
-							tc_malloc_stats();
-						}
-					}
-#endif
-
-				default: break;
-			}
-		};
-		sigaction(SIGHUP, &act, nullptr);
-		sigaction(SIGINT, &act, nullptr);
-		sigaction(SIGTERM, &act, nullptr);
-		sigaction(SIGQUIT, &act, nullptr);
-		sigaction(SIGUSR1, &act, nullptr);
-		sigaction(SIGUSR2, &act, nullptr);
-		sigaction(SIGILL, &act, nullptr);		
 	}
 
 	NetworkService::~NetworkService() {

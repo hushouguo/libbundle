@@ -461,7 +461,7 @@ dont_need_mkdir:
 	u32 getStackSizeLimit() {
 		struct rlimit limit;
 		int rc = getrlimit(RLIMIT_STACK, &limit);
-		CHECK_RETURN(rc == 0, false, "getrlimit error:%d,%s", errno, strerror(errno));
+		CHECK_RETURN(rc == 0, 0, "getrlimit error:%d,%s", errno, strerror(errno));
 		return limit.rlim_cur;
 	}
 	
@@ -479,7 +479,7 @@ dont_need_mkdir:
 	u32 getOpenFilesLimit() {
 		struct rlimit limit;
 		int rc = getrlimit(RLIMIT_NOFILE, &limit);
-		CHECK_RETURN(rc == 0, false, "getrlimit error:%d,%s", errno, strerror(errno));
+		CHECK_RETURN(rc == 0, 0, "getrlimit error:%d,%s", errno, strerror(errno));
 		return limit.rlim_cur;
 	}
 
@@ -542,83 +542,6 @@ dont_need_mkdir:
 		}
 	}
 
-
-	//
-	// default signal handler
-	//
-
-	static void signal_shutdown_handler(int sig)
-	{
-		Alarm.cout("received signal: %d(%s)", sig, signalString(sig));
-		switch (sig)
-		{
-			case SIGHUP:
-				break;
-			case SIGALRM:
-				break;
-			case SIGINT:
-			case SIGTERM:
-			case SIGQUIT:				
-				break;
-			case SIGUSR1:
-			case SIGUSR2:
-				break;
-			default:
-				Alarm.cout("unhandle signal: %d(%s)", sig, signalString(sig)); break;
-		};
-	}
-
-	void initSignalHandler()
-	{
-		signal(SIGHUP, SIG_IGN);		// 1
-		signal(SIGINT, SIG_IGN);		// 2
-		signal(SIGQUIT, SIG_IGN);		// 3
-		signal(SIGILL, SIG_IGN);		// 4
-		signal(SIGTRAP, SIG_IGN);		// 5
-		//signal(SIGABRT, SIG_IGN);		// 6
-		signal(SIGIOT, SIG_IGN);		// 6
-		signal(SIGBUS, SIG_IGN);		// 7
-		signal(SIGFPE, SIG_IGN);		// 8
-		//signal(SIGKILL, SIG_IGN);		// 9
-		signal(SIGUSR1, SIG_IGN);	   	// 10
-		signal(SIGSEGV, SIG_IGN);	   	// 11
-		signal(SIGUSR2, SIG_IGN);	   	// 12
-		signal(SIGPIPE, SIG_IGN);	   	// 13
-		signal(SIGALRM, SIG_IGN);	   	// 14
-		signal(SIGTERM, SIG_IGN);	   	// 15
-		signal(SIGSTKFLT, SIG_IGN);   	// 16
-		//signal(SIGCHLD, SIG_IGN);	   	// 17
-		signal(SIGCONT, SIG_IGN);	   	// 18
-		//signal(SIGSTOP, SIG_IGN);	   	// 19
-		signal(SIGTSTP, SIG_IGN);   	// 20
-		signal(SIGTTIN, SIG_IGN);	   	// 21
-		signal(SIGTTOU, SIG_IGN);	   	// 22
-		signal(SIGURG, SIG_IGN);	   	// 23
-		signal(SIGXCPU, SIG_IGN);	   	// 24
-		signal(SIGXFSZ, SIG_IGN);	   	// 25
-		signal(SIGVTALRM, SIG_IGN);   	// 26
-		signal(SIGPROF, SIG_IGN);	   	// 27
-		signal(SIGWINCH, SIG_IGN);    	// 28
-		signal(SIGIO, SIG_IGN);	   		// 29
- 		signal(SIGPWR, SIG_IGN);      	// 30
- 		signal(SIGSYS, SIG_IGN);      	// 31		
-
-
-		struct sigaction act;
-		
-		sigemptyset(&act.sa_mask);
-		act.sa_flags = SA_RESTART;
-		act.sa_handler = signal_shutdown_handler;
-		sigaction(SIGHUP, &act, nullptr);
-		sigaction(SIGINT, &act, nullptr);
-		sigaction(SIGTERM, &act, nullptr);
-		//sigaction(SIGKILL, &act, nullptr);
-		sigaction(SIGQUIT, &act, nullptr);
-		sigaction(SIGUSR1, &act, nullptr);
-		sigaction(SIGUSR2, &act, nullptr);
-		sigaction(SIGALRM, &act, nullptr);
-	}
-
 	const char* signalString(int sig)
 	{
 		static const char* __sig_string[] = {
@@ -660,6 +583,7 @@ dont_need_mkdir:
 			[SIGPWR] = "SIGPWR",
 
 			[SIGSYS] = "SIGSYS",
+			[SIGRTMIN] = "SIGRTMIN",
 		};
 		return sig > 0 && sig < (int)(sizeof(__sig_string)/sizeof(__sig_string[0])) ? __sig_string[sig] : "null";
 	}
@@ -707,44 +631,160 @@ dont_need_mkdir:
 	    }
 	    return true;
 	}
-	void setSignal(int sig) {
+
+	const char* getProgramName() {
+#if defined(__APPLE__) || defined(__FreeBSD__)
+		return getprogname();	// need libbsd
+#elif defined(_GNU_SOURCE)
+		extern char *program_invocation_name;		// like: ./bin/routine
+		extern char *program_invocation_short_name;	// like: routine
+		return program_invocation_short_name;
+#else
+		extern char *__progname;					// routine:  defined by the libc
+		return __progname;
+#endif
+	}
+	
+	bool init_runtime_environment(int argc, char* argv[]) {
+		// Verify that the version of the library that we linked against is
+		// compatible with the version of the headers we compiled against.
+		GOOGLE_PROTOBUF_VERIFY_VERSION;
+		
+		//
+		// parser command line arguments
+		//
+		if (!sConfig.init(argc, argv)) { return false; }
+		
+		//
+		// config Easylog
+		//
+		Easylog::syslog()->set_level((EasylogSeverityLevel) sConfig.get("log.level", GLOBAL));
+		Easylog::syslog()->set_autosplit_day(sConfig.get("log.autosplit_day", true));
+		Easylog::syslog()->set_autosplit_hour(sConfig.get("log.autosplit_hour", false));
+		Easylog::syslog()->set_destination(sConfig.get("log.dir", ".logs"));
+		Easylog::syslog()->set_tofile(GLOBAL, getProgramName());
+		Easylog::syslog()->set_tostdout(GLOBAL, sConfig.runasdaemon ? false : true);
+		
+		//
+		// limit
+		//
+		size_t stack_size = sConfig.get("limit.stack_size", 0u);
+		if (stack_size > 0) {
+			setStackSizeLimit(stack_size);
+		}
+
+		size_t max_files = sConfig.get("limit.max_files", 0u);
+		if (max_files > 0) {
+			setOpenFilesLimit(max_files);
+		}
+
+		Trace << "StackSize: " << getStackSizeLimit() << ", MaxOpenFiles: " << getOpenFilesLimit();		
+		
+		//
+		// install signal handler
+		//
 		struct sigaction act;
-		// `sa_handler` will not take effect if it is not set
-		// default action:
-		// abort: SIGABRT,SIGBUS,SIGFPE,SIGILL,SIGIOT,SIGQUIT,SIGSEGV,SIGTRAP,SIGXCPU,SIGXFSZ
-		// exit: SIGALRM,SIGHUP,SIGINT,SIGKILL,SIGPIPE,SIGPOLL,SIGPROF,SIGSYS,SIGTERM,SIGUSR1,SIGUSR2,SIGVTALRM
-		// stop: SIGSTOP,SIGTSTP,SIGTTIN,SIGTTOU
-		// default ignore: SIGCHLD,SIGPWR,SIGURG,SIGWINCH
-        act.sa_handler = [](int) {
-			// Don't call Non reentrant function, just like malloc, free etc, i/o function also cannot call.
-		};
         sigemptyset(&act.sa_mask);
-        sigaddset(&act.sa_mask, sig);
         act.sa_flags = SA_INTERRUPT; //The system call that is interrupted by this signal will not be restarted automatically
-        sigaction(sig, &act, nullptr);
+        act.sa_handler = [](int sig) {
+			// Don't call Non reentrant function, just like malloc, free etc, i/o function also cannot call.
+			switch (sig) {
+				case SIGHUP:			// NOTE: reload configure file
+					sConfig.reload = true;
+				case SIGRTMIN: 			// Wake up thread, nothing to do
+				case SIGALRM: break;	// timer expire
+				default: 
+					sConfig.syshalt(sig); break;
+			}
+		};
+		sigaction(SIGHUP, &act, nullptr);		// 1
+		sigaction(SIGINT, &act, nullptr);		// 2
+		sigaction(SIGQUIT, &act, nullptr);		// 3
+		sigaction(SIGILL, &act, nullptr);		// 4
+		sigaction(SIGTRAP, &act, nullptr);		// 5
+		sigaction(SIGABRT, &act, nullptr);		// 6
+		sigaction(SIGIOT, &act, nullptr);		// 6
+		sigaction(SIGBUS, &act, nullptr);		// 7
+		sigaction(SIGFPE, &act, nullptr);		// 8
+		// 9 => SIGKILL
+		sigaction(SIGUSR1, &act, nullptr);		// 10
+		sigaction(SIGSEGV, &act, nullptr);		// 11
+		sigaction(SIGUSR2, &act, nullptr);		// 12
+		sigaction(SIGPIPE, &act, nullptr);		// 13
+		sigaction(SIGALRM, &act, nullptr);		// 14
+		sigaction(SIGTERM, &act, nullptr);		// 15
+		sigaction(SIGSTKFLT, &act, nullptr); 	// 16
+		// 17 => SIGCHLD
+		sigaction(SIGCONT, &act, nullptr);		// 18
+		// 19 => SIGSTOP
+		sigaction(SIGTSTP, &act, nullptr);		// 20
+		sigaction(SIGTTIN, &act, nullptr);		// 21
+		sigaction(SIGTTOU, &act, nullptr);		// 22
+		sigaction(SIGURG, &act, nullptr);		// 23
+		sigaction(SIGXCPU, &act, nullptr);		// 24
+		sigaction(SIGXFSZ, &act, nullptr);		// 25
+		sigaction(SIGVTALRM, &act, nullptr); 	// 26
+		sigaction(SIGPROF, &act, nullptr);		// 27
+		sigaction(SIGWINCH, &act, nullptr);		// 28
+		sigaction(SIGIO, &act, nullptr); 		// 29
+		sigaction(SIGPWR, &act, nullptr);		// 30
+		sigaction(SIGSYS, &act, nullptr);		// 31
+		sigaction(SIGRTMIN, &act, nullptr);		// 34
+
+		//
+		// output current shard
+		//
+		u32 shard = sConfig.get("shard.id", 0u);
+		if (shard > 0) {
+			Trace << "shard: " << shard;
+		}
+		else {
+			Trace << "shard: not configured";
+		}
+		
+		//
+		// output 3rd libraries
+		//
+		Trace.cout("	libbundle: %d.%d.%d", BUNDLE_VERSION_MAJOR, BUNDLE_VERSION_MINOR, BUNDLE_VERSION_PATCH);
+		
+#ifdef TC_VERSION_MAJOR		
+		Trace.cout("	tcmalloc: %d.%d%s", TC_VERSION_MAJOR, TC_VERSION_MINOR, TC_VERSION_PATCH);
+#else
+		Trace.cout("	not link tcmalloc");
+#endif
+		
+#ifdef LIBEVENT_VERSION
+		Trace.cout("	libevent: %s", LIBEVENT_VERSION);
+#endif
+		
+#ifdef ZMQ_VERSION_MAJOR
+		Trace.cout("	libzmq: %d.%d.%d", ZMQ_VERSION_MAJOR, ZMQ_VERSION_MINOR, ZMQ_VERSION_PATCH);
+#endif
+		
+#ifdef LUAJIT_VERSION
+		Trace.cout("	luaJIT: %s -- %s", LUAJIT_VERSION, LUAJIT_COPYRIGHT);
+#endif
+		
+#ifdef GOOGLE_PROTOBUF_VERSION
+		Trace.cout("	protobuf: %d, library: %d", GOOGLE_PROTOBUF_VERSION, GOOGLE_PROTOBUF_MIN_LIBRARY_VERSION);
+#endif
+		
+		Trace.cout("	rapidxml: 1.13");
+		
+#ifdef MYSQL_SERVER_VERSION		
+		Trace.cout("	mysql: %s", MYSQL_SERVER_VERSION);
+#endif
+		
+		Trace.cout("	gcc version: %d.%d.%d", __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__);
 	}
 
-#if 0
-	void printLibraryVersion()
-	{
-		log_trace("shard: %d.%d.%d Startup!", SHARD_VERSION_MAJOR, SHARD_VERSION_MINOR, SHARD_VERSION_PATCH);
-#ifdef TC_VERSION_MAJOR		
-		log_trace("gperftools: %d.%d%s", TC_VERSION_MAJOR, TC_VERSION_MINOR, TC_VERSION_PATCH);
-#endif		
-		log_trace("libevent: %s", LIBEVENT_VERSION);
-		log_trace("libzmq: %d.%d.%d", ZMQ_VERSION_MAJOR, ZMQ_VERSION_MINOR, ZMQ_VERSION_PATCH);
-#ifdef USE_SCRIPT_LUA
-		log_trace("luaJIT: %s -- %s", LUAJIT_VERSION, LUAJIT_COPYRIGHT);
-#endif
-		log_trace("protobuf: %d, library: %d", GOOGLE_PROTOBUF_VERSION, GOOGLE_PROTOBUF_MIN_LIBRARY_VERSION);
-		log_trace("rapidxml: 1.13");
-#ifdef USE_DB_MYSQL		
-		log_trace("mysql: %s", MYSQL_SERVER_VERSION);
-#endif
-		log_trace("gcc version: %d.%d.%d", __GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__);
-		sConfig.dump();
+	void shutdown_bundle_library() {
+		//NOTE: cleanup internal resource
+		Trace.cout("shutdown bundle library with terminate reason: %d", sConfig.terminate_reason);
+		Easylog::syslog()->stop();
+		// Optional:  Delete all global objects allocated by libprotobuf.
+		google::protobuf::ShutdownProtobufLibrary();
 	}
-#endif	
 
 	void* memdup(void* buffer, size_t size) {
 		void* newbuffer = ::malloc(size);
@@ -770,24 +810,5 @@ dont_need_mkdir:
 			strcpy(argv[i], __argv[i].c_str());
 		}
 	}
-	
-	//
-	// setup runtime environment
-	//
-
-#if 0
-	void setupRuntimeEnvironment()
-	{
-		shard::initSignalHandler();
-		shard::setStackSizeLimit(sConfig.MaxStackSize);
-		shard::setOpenFilesLimit(sConfig.MaxOpenFiles);
-		shard::printLibraryVersion();
-		log_trace("stack size limits: %u", shard::getStackSizeLimit());
-		log_trace("open files limits: %u", shard::getOpenFilesLimit());
-		//if (sConfig.shardid == 0) {
-		//	log_alarm("`shardid` NOT SPECIFIED!");
-		//}
-	}
-#endif
 }
 

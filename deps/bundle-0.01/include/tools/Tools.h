@@ -74,7 +74,25 @@ BEGIN_NAMESPACE_BUNDLE {
 	void* memdup(void* buffer, size_t size);
 	void setProcesstitle(int argc, char* argv[], const char* title);
 	void resetProcesstitle(int argc, char* argv[]);
-	void setSignal(int sig);
+	const char* getProgramName();
+	template <typename HANDLER>
+	void setSignal(int sig, HANDLER handler) {
+		struct sigaction act;
+		// `sa_handler` will not take effect if it is not set
+		// default action:
+		// abort: SIGABRT,SIGBUS,SIGFPE,SIGILL,SIGIOT,SIGQUIT,SIGSEGV,SIGTRAP,SIGXCPU,SIGXFSZ
+		// exit: SIGALRM,SIGHUP,SIGINT,SIGKILL,SIGPIPE,SIGPOLL,SIGPROF,SIGSYS,SIGTERM,SIGUSR1,SIGUSR2,SIGVTALRM
+		// stop: SIGSTOP,SIGTSTP,SIGTTIN,SIGTTOU
+		// default ignore: SIGCHLD,SIGPWR,SIGURG,SIGWINCH
+		// Don't call Non reentrant function, just like malloc, free etc, i/o function also cannot call.
+        act.sa_handler = handler;
+        sigemptyset(&act.sa_mask);
+        sigaddset(&act.sa_mask, sig);
+        act.sa_flags = SA_INTERRUPT; //The system call that is interrupted by this signal will not be restarted automatically
+        sigaction(sig, &act, nullptr);
+	}
+	bool init_runtime_environment(int argc, char* argv[]);
+	void shutdown_bundle_library();
 
 
 	// This function does not distinguish between a missing key and a key mapped

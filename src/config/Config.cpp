@@ -64,6 +64,6 @@ BEGIN_NAMESPACE_BUNDLE {
 
 		return confile.empty() ? true : this->loadconf(confile.c_str());
 	}
-
+	
 	INITIALIZE_INSTANCE(Config);
 }

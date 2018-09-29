@@ -42,8 +42,6 @@ BEGIN_NAMESPACE_BUNDLE {
 			std::function<void(NetworkService*, NetworkInterface*)> _establishConnection = nullptr;
 			std::function<void(NetworkService*, NetworkInterface*)> _lostConnection = nullptr;
 			std::function<bool(NetworkService*, NetworkInterface*, const Netmessage*)> _msgParser = nullptr;
-			void init_signal();
-			void setup_runtime_environment();
 	};
 }
 

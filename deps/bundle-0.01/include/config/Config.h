@@ -11,7 +11,14 @@ BEGIN_NAMESPACE_BUNDLE {
 		public:
 			bool halt = false;
 			bool runasdaemon = false;
-			inline void syshalt() { this->halt = true; }
+			bool reload = false;
+			int  terminate_reason = 0;
+			inline void syshalt(int reason = 0) {
+				if (!this->halt) {
+					terminate_reason = reason;
+					this->halt = true;
+				}
+			}
 			bool init(int argc, char* argv[]);
 
 		private:
