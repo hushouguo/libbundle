@@ -163,11 +163,9 @@ BEGIN_NAMESPACE_BUNDLE {
 			}
 
 			// release readQueue messages
-			for (;;) {
+			for (;this->_readQueue.empty() == false;) {
 				Socketmessage* msg = this->_readQueue.pop_front();
-				if (!msg) {
-					break;
-				}
+				assert(msg);
 				bundle::releaseMessage(msg);
 			}
 

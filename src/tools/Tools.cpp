@@ -583,7 +583,7 @@ dont_need_mkdir:
 			[SIGPWR] = "SIGPWR",
 
 			[SIGSYS] = "SIGSYS",
-			[SIGRTMIN] = "SIGRTMIN",
+//			[SIGRTMIN] = "SIGRTMIN",
 		};
 		return sig > 0 && sig < (int)(sizeof(__sig_string)/sizeof(__sig_string[0])) ? __sig_string[sig] : "null";
 	}
@@ -636,12 +636,12 @@ dont_need_mkdir:
 #if defined(__APPLE__) || defined(__FreeBSD__)
 		return getprogname();	// need libbsd
 #elif defined(_GNU_SOURCE)
-		extern char *program_invocation_name;		// like: ./bin/routine
-		extern char *program_invocation_short_name;	// like: routine
-		return program_invocation_short_name;
+		//extern char* program_invocation_name;			// like: ./bin/routine
+		//extern char* program_invocation_short_name;	// like: routine
+		return ::program_invocation_short_name;
 #else
-		extern char *__progname;					// routine:  defined by the libc
-		return __progname;
+		//extern char *__progname;						// routine:  defined by the libc
+		return ::__progname;
 #endif
 	}
 	
@@ -687,11 +687,14 @@ dont_need_mkdir:
         sigemptyset(&act.sa_mask);
         act.sa_flags = SA_INTERRUPT; //The system call that is interrupted by this signal will not be restarted automatically
         act.sa_handler = [](int sig) {
+			fprintf(stderr, "signal: %d\n", sig);
 			// Don't call Non reentrant function, just like malloc, free etc, i/o function also cannot call.
+			if (sig == SIGRTMIN) {		// SIGRTMIN: Wake up thread, nothing to do
+				return;	// SIGRTMIN: #define SIGRTMIN        (__libc_current_sigrtmin ())
+			}
 			switch (sig) {
 				case SIGHUP:			// NOTE: reload configure file
 					sConfig.reload = true;
-				case SIGRTMIN: 			// Wake up thread, nothing to do
 				case SIGALRM: break;	// timer expire
 				default: 
 					sConfig.syshalt(sig); break;
@@ -745,37 +748,40 @@ dont_need_mkdir:
 		//
 		// output 3rd libraries
 		//
-		Trace.cout("	libbundle: %d.%d.%d", BUNDLE_VERSION_MAJOR, BUNDLE_VERSION_MINOR, BUNDLE_VERSION_PATCH);
+		Trace.cout("all 3rd libraries:");
+		Trace.cout("    libbundle: %d.%d.%d", BUNDLE_VERSION_MAJOR, BUNDLE_VERSION_MINOR, BUNDLE_VERSION_PATCH);
 		
 #ifdef TC_VERSION_MAJOR		
-		Trace.cout("	tcmalloc: %d.%d%s", TC_VERSION_MAJOR, TC_VERSION_MINOR, TC_VERSION_PATCH);
+		Trace.cout("    tcmalloc: %d.%d%s", TC_VERSION_MAJOR, TC_VERSION_MINOR, TC_VERSION_PATCH);
 #else
-		Trace.cout("	not link tcmalloc");
+		Trace.cout("    not link tcmalloc");
 #endif
 		
 #ifdef LIBEVENT_VERSION
-		Trace.cout("	libevent: %s", LIBEVENT_VERSION);
+		Trace.cout("    libevent: %s", LIBEVENT_VERSION);
 #endif
 		
 #ifdef ZMQ_VERSION_MAJOR
-		Trace.cout("	libzmq: %d.%d.%d", ZMQ_VERSION_MAJOR, ZMQ_VERSION_MINOR, ZMQ_VERSION_PATCH);
+		Trace.cout("    libzmq: %d.%d.%d", ZMQ_VERSION_MAJOR, ZMQ_VERSION_MINOR, ZMQ_VERSION_PATCH);
 #endif
 		
 #ifdef LUAJIT_VERSION
-		Trace.cout("	luaJIT: %s -- %s", LUAJIT_VERSION, LUAJIT_COPYRIGHT);
+		Trace.cout("    luaJIT: %s -- %s", LUAJIT_VERSION, LUAJIT_COPYRIGHT);
 #endif
 		
 #ifdef GOOGLE_PROTOBUF_VERSION
-		Trace.cout("	protobuf: %d, library: %d", GOOGLE_PROTOBUF_VERSION, GOOGLE_PROTOBUF_MIN_LIBRARY_VERSION);
+		Trace.cout("    protobuf: %d, library: %d", GOOGLE_PROTOBUF_VERSION, GOOGLE_PROTOBUF_MIN_LIBRARY_VERSION);
 #endif
 		
-		Trace.cout("	rapidxml: 1.13");
+		Trace.cout("    rapidxml: 1.13");
 		
 #ifdef MYSQL_SERVER_VERSION		
-		Trace.cout("	mysql: %s", MYSQL_SERVER_VERSION);
+		Trace.cout("    mysql: %s", MYSQL_SERVER_VERSION);
 #endif
 		
-		Trace.cout("	gcc version: %d.%d.%d", __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__);
+		Trace.cout("    gcc version: %d.%d.%d", __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__);
+
+		return true;
 	}
 
 	void shutdown_bundle_library() {

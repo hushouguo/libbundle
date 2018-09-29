@@ -128,7 +128,7 @@ void test_net() {
 
 	auto runnable = []() {
 		u32 n = 0;
-		while (n < N) {
+		while (!sConfig.halt) {
 			SOCKET s = -1;
 			bool establish = false, close = false;
 			const Socketmessage* msg = ss->receiveMessage(s, establish, close);
@@ -152,5 +152,7 @@ void test_net() {
 	};
 
 	runnable();
+
+	SafeDelete(ss);
 }
 

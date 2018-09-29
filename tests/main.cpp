@@ -13,9 +13,8 @@
 #include "entity/test_entity.h"
 #include "lockfree/test_lockfree.h"
 
-int main() {	
-	bundle::setSignal(SIGRTMIN);
-
+int main(int argc, char** argv) {	
+	if (!bundle::init_runtime_environment(argc, argv)) { return 1; }
 	bundle::Easylog::syslog()->set_tostdout(bundle::GLOBAL, true);
 
 	//test_tools();
@@ -29,6 +28,6 @@ int main() {
 	//test_entity();
 	//test_lockfree();
 
-	bundle::Easylog::syslog()->stop();
+	bundle::shutdown_bundle_library();
 	return 0;
 }
