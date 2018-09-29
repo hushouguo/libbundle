@@ -86,6 +86,7 @@
 #include <getopt.h>
 #include <wchar.h>
 #include <locale.h>
+#include <libgen.h>
 #endif
 
 #ifdef PLATFORM_WINDOWS

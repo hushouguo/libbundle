@@ -13,7 +13,7 @@
 
 BEGIN_NAMESPACE_BUNDLE {
 
-	static int __sys_cpus = 1;
+	static u32 __sys_cpus = 1;
 
 #ifdef PLATFORM_LINUX
 	__attribute__((constructor)) static void __sys_cpus_init() {
@@ -24,7 +24,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 	//
 	// get the number of cpu
-	int cpus() {
+	u32 cpus() {
 #if __cplusplus > 199711L	
 		return std::thread::hardware_concurrency();
 #else		
@@ -32,11 +32,11 @@ BEGIN_NAMESPACE_BUNDLE {
 #endif
 	}
 
-	
+
 #define SYS_ERRNO	128
-	
+
 	static char** __errlist = nullptr;
-	
+
 #ifdef PLATFORM_LINUX
 	__attribute__((constructor)) static void __strerror_init() {
 		if (!__errlist) {
@@ -56,7 +56,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		}
 	}
 #endif
-	
+
 	//
 	// like ::strerror
 	const char* strerror(int err) {
@@ -112,7 +112,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 		struct tm result;
 		gmtime_r(&tv.tv_sec, &result);
-		
+
 		std::strftime(buffer, len, time_format, &result);
 
 		return (const char *) buffer;
@@ -122,7 +122,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		if (!time_format) {
 			time_format = "%y/%02m/%02d %02H:%02M:%02S"; // 18/06/29 15:04:18
 		}
-	
+
 		std::time_t seconds;
 		std::time_t ts_milliseconds;
 		if (milliseconds == 0) {
@@ -137,7 +137,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			seconds = milliseconds / 1000;
 			ts_milliseconds = milliseconds % 1000;
 		}
-	
+
 		//Note: for GCC 5, std::get_time or std::put_time available
 		//std::locale::global(std::locale("ja_JP.utf8"));
 		//std::tm local_time_now = * std::localtime(&seconds);
@@ -145,7 +145,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		if (with_milliseconds) {
 			std::snprintf(&buf[n], len - n, "|%03ld", ts_milliseconds);
 		}
-	
+
 		return (const char *) buf;	
 	}
 #endif
@@ -176,7 +176,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		return hashString(s.data(), s.length());
 	}
 
-		
+
 	//
 	// extrace string to int, long, long long or string by specifying seperate character
 	bool splitString(const char* cstr, char sc, std::vector<int>& v) {
@@ -203,7 +203,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			v.push_back(value);
 			s = p;
 		}
-		
+
 		if (*s != '\0') {
 #if true		
 			std::string ss = s;
@@ -229,107 +229,107 @@ BEGIN_NAMESPACE_BUNDLE {
 		return true;
 	}
 
-			bool splitString(const char* cstr, char sc, std::vector<long>& v) {
-				char* newstr = strdup(cstr);
-				int value = 0;
-				char *s = newstr, *p = newstr;
-				while ((p = strchr(p, sc)) != nullptr) {
-					*p++ = '\0';
+	bool splitString(const char* cstr, char sc, std::vector<long>& v) {
+		char* newstr = strdup(cstr);
+		int value = 0;
+		char *s = newstr, *p = newstr;
+		while ((p = strchr(p, sc)) != nullptr) {
+			*p++ = '\0';
 #if true
-					std::string ss = s;
-					try {
-						value = std::stol(ss);
-					} catch(...) {
-						SafeFree(newstr);
-						return false;
-					}
-#else
-					value = strtol(s, (char**)NULL, 10);
-					if (errno == EINVAL || errno == ERANGE) {
-						SafeFree(newstr); 
-						return false;
-					}
-#endif			
-					v.push_back(value);
-					s = p;
-				}
-				
-				if (*s != '\0') {
-#if true		
-					std::string ss = s;
-					try {
-						value = std::stol(ss);
-					} catch(...) {
-						SafeFree(newstr);
-						return false;
-					}
-#else
-					value = strtol(s, (char**) nullptr, 10);
-					if (errno == EINVAL || errno == ERANGE) {
-						SafeFree(newstr); 
-						return false;
-					}
-#endif
-					v.push_back(value);
-				}
-				else {
-					// Note: add default value ??
-				}
+			std::string ss = s;
+			try {
+				value = std::stol(ss);
+			} catch(...) {
 				SafeFree(newstr);
-				return true;
+				return false;
 			}
-	
-		bool splitString(const char* cstr, char sc, std::vector<long long>& v) {
-			char* newstr = strdup(cstr);
-			int value = 0;
-			char *s = newstr, *p = newstr;
-			while ((p = strchr(p, sc)) != nullptr) {
-				*p++ = '\0';
-#if true
-				std::string ss = s;
-				try {
-					value = std::stoll(ss);
-				} catch(...) {
-					SafeFree(newstr);
-					return false;
-				}
 #else
-				value = strtoll(s, (char**)NULL, 10);
-				if (errno == EINVAL || errno == ERANGE) {
-					SafeFree(newstr); 
-					return false;
-				}
+			value = strtol(s, (char**)NULL, 10);
+			if (errno == EINVAL || errno == ERANGE) {
+				SafeFree(newstr); 
+				return false;
+			}
 #endif			
-				v.push_back(value);
-				s = p;
-			}
-			
-			if (*s != '\0') {
-#if true		
-				std::string ss = s;
-				try {
-					value = std::stoll(ss);
-				} catch(...) {
-					SafeFree(newstr);
-					return false;
-				}
-#else
-				value = strtoll(s, (char**) nullptr, 10);
-				if (errno == EINVAL || errno == ERANGE) {
-					SafeFree(newstr); 
-					return false;
-				}
-#endif
-				v.push_back(value);
-			}
-			else {
-				// Note: add default value ??
-			}
-			SafeFree(newstr);
-			return true;
+			v.push_back(value);
+			s = p;
 		}
-	
-		
+
+		if (*s != '\0') {
+#if true		
+			std::string ss = s;
+			try {
+				value = std::stol(ss);
+			} catch(...) {
+				SafeFree(newstr);
+				return false;
+			}
+#else
+			value = strtol(s, (char**) nullptr, 10);
+			if (errno == EINVAL || errno == ERANGE) {
+				SafeFree(newstr); 
+				return false;
+			}
+#endif
+			v.push_back(value);
+		}
+		else {
+			// Note: add default value ??
+		}
+		SafeFree(newstr);
+		return true;
+	}
+
+	bool splitString(const char* cstr, char sc, std::vector<long long>& v) {
+		char* newstr = strdup(cstr);
+		int value = 0;
+		char *s = newstr, *p = newstr;
+		while ((p = strchr(p, sc)) != nullptr) {
+			*p++ = '\0';
+#if true
+			std::string ss = s;
+			try {
+				value = std::stoll(ss);
+			} catch(...) {
+				SafeFree(newstr);
+				return false;
+			}
+#else
+			value = strtoll(s, (char**)NULL, 10);
+			if (errno == EINVAL || errno == ERANGE) {
+				SafeFree(newstr); 
+				return false;
+			}
+#endif			
+			v.push_back(value);
+			s = p;
+		}
+
+		if (*s != '\0') {
+#if true		
+			std::string ss = s;
+			try {
+				value = std::stoll(ss);
+			} catch(...) {
+				SafeFree(newstr);
+				return false;
+			}
+#else
+			value = strtoll(s, (char**) nullptr, 10);
+			if (errno == EINVAL || errno == ERANGE) {
+				SafeFree(newstr); 
+				return false;
+			}
+#endif
+			v.push_back(value);
+		}
+		else {
+			// Note: add default value ??
+		}
+		SafeFree(newstr);
+		return true;
+	}
+
+
 	bool splitString(const char* cstr, char sc, std::vector<std::string>& v) {
 		char *newstr = strdup(cstr);
 		char *s = newstr, *p = newstr;
@@ -350,7 +350,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 	//
 	// string and wstring convert each other
-	
+
 #if __GNUC__ >= 5
 	std::wstring string2wstring(const std::string& s)
 	{
@@ -358,7 +358,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		std::wstring_convert<convert_typeX, wchar_t> converterX;
 		return converterX.from_bytes(s);
 	}
-	
+
 	std::string wstring2string(const std::wstring& ws)
 	{
 		using convert_typeX = std::codecvt_utf8<wchar_t>;
@@ -391,7 +391,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		return s;
 	}	
 #endif
-	
+
 #pragma pack(1)
 	union NetworkEndpoint {
 		struct {
@@ -412,7 +412,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		u.port = htons(port);		
 		return u.value;
 	}
-	
+
 	std::tuple<std::string, int> splitNetworkEndpoint(u64 value) {
 		NetworkEndpoint u;
 		u.value = value;		
@@ -428,43 +428,8 @@ BEGIN_NAMESPACE_BUNDLE {
 		::gethostname(__hostname, sizeof(__hostname));
 		return __hostname;
 	}
-	
-		const char* getCurrentDirectory() {
-			static char __dir_buffer[PATH_MAX];
-	//#if defined(_GNU_SOURCE)
-#if false
-			// absolute path name, like: /home/hushouguo/libbundle/tests 
-			const char* s = get_current_dir_name(); 		
-			strncpy(__dir_buffer, s, sizeof(__dir_buffer));
-			SafeFree(s);
-			return __dir_buffer;
-#else
-			// absolute path name, like: /home/hushouguo/libbundle/tests
-			return ::getcwd(__dir_buffer, sizeof(__dir_buffer));
-#endif
-		}
-	
-		const char* getDirectoryName(const char* fullname) {
-			static char __dir_buffer[PATH_MAX];
-			strncpy(__dir_buffer, fullname, sizeof(__dir_buffer));
-			return dirname(__dir_buffer);
-		}
-	
-		const char* getFilename(const char* fullname) {
-			static char __filename_buffer[PATH_MAX];
-			strncpy(__filename_buffer, fullname, sizeof(__filename_buffer));
-			return basename(__filename_buffer);
-		}
-	
-		const char* absoluteDirectory(const char* fullname) {
-			static char __dir_buffer[PATH_MAX]; 	
-			char* realdir = realpath(getDirectoryName(fullname), nullptr);
-			snprintf(__dir_buffer, sizeof(__dir_buffer), "%s/%s", realdir, getFilename(fullname));
-			SafeFree(realdir);
-			return __dir_buffer;
-		}
-		
-	
+
+
 	//
 	// test for the file is a directory
 	bool isDir(const char* file) {
@@ -491,52 +456,52 @@ BEGIN_NAMESPACE_BUNDLE {
 		return access(file, X_OK) == 0;
 	}
 
-		//
-		// create inexistence folder
-		bool createDirectory(const char* path) {
-			// store current workspace
-			const char* current_folder = getCurrentDirectory(); 	
-			char name[PATH_MAX], *dir = name;
-			strncpy(name, path, sizeof(name));
-			while (dir != nullptr) {
-				char* tailer = strchr(dir, '/');
-				if (tailer) {
-					*tailer++ = '\0';
-				}
-	
-				if (strlen(dir) == 0) {
-					goto dont_need_mkdir;
-				}
-	
-				if (access(dir, F_OK)) {
-					umask(0);
-					if (mkdir(dir, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) == -1) { 
-						Error.cout("mkdir directory:%s error: %d, %s", dir, errno, strerror(errno));
-						return false;
-					}
-				}
-	
-				if (access(dir, X_OK)) {
-					Error.cout("access directory:%s error: %d, %s", dir, errno, strerror(errno));
-					return false;
-				}
-	
-				if (chdir(dir)) {
-					Error.cout("chdir directory:%s error: %d, %s", dir, errno, strerror(errno));
-					return false;
-				}
-	
-	dont_need_mkdir:			
-				dir = tailer;
+	//
+	// create inexistence folder
+	bool createDirectory(const char* path) {
+		// store current workspace
+		const char* current_folder = getCurrentDirectory(); 	
+		char name[PATH_MAX], *dir = name;
+		strncpy(name, path, sizeof(name));
+		while (dir != nullptr) {
+			char* tailer = strchr(dir, '/');
+			if (tailer) {
+				*tailer++ = '\0';
 			}
-	
-			// restore workspace
-			return chdir(current_folder) == 0;
+
+			if (strlen(dir) == 0) {
+				goto dont_need_mkdir;
+			}
+
+			if (access(dir, F_OK)) {
+				umask(0);
+				if (mkdir(dir, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) == -1) { 
+					Error.cout("mkdir directory:%s error: %d, %s", dir, errno, strerror(errno));
+					return false;
+				}
+			}
+
+			if (access(dir, X_OK)) {
+				Error.cout("access directory:%s error: %d, %s", dir, errno, strerror(errno));
+				return false;
+			}
+
+			if (chdir(dir)) {
+				Error.cout("chdir directory:%s error: %d, %s", dir, errno, strerror(errno));
+				return false;
+			}
+
+dont_need_mkdir:			
+			dir = tailer;
 		}
 
-		
-		//
-		// iterate specifying folder
+		// restore workspace
+		return chdir(current_folder) == 0;
+	}
+
+
+	//
+	// iterate specifying folder
 	bool traverseDirectory(const char* folder, const char* filter_suffix, std::function<bool(const char*)>& callback) {
 		if (!isDir(folder)) {
 			return callback(folder);
@@ -568,7 +533,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		return true;
 	}
 
-	
+
 	//
 	// get existence file size
 	u64 getFileSize(const char* filename) {
@@ -598,12 +563,12 @@ BEGIN_NAMESPACE_BUNDLE {
 		}		
 		return true;
 	}
-	
+
 
 
 	//
 	// limits: stack_size, max_files
-	
+
 	// limits, linux default stack size: 8M (soft), 4G (hard)
 	bool setStackSizeLimit(u32 value) {
 		struct rlimit limit;
@@ -614,14 +579,14 @@ BEGIN_NAMESPACE_BUNDLE {
 		CHECK_RETURN(rc == 0, false, "setrlimit error:%d,%s", errno, strerror(errno));
 		return true;
 	}
-	
+
 	u32 getStackSizeLimit() {
 		struct rlimit limit;
 		int rc = getrlimit(RLIMIT_STACK, &limit);
 		CHECK_RETURN(rc == 0, 0, "getrlimit error:%d,%s", errno, strerror(errno));
 		return limit.rlim_cur;
 	}
-	
+
 	// limits, linux default open files: 1024 (soft), 4096 (hard)
 	bool setOpenFilesLimit(u32 value) {
 		struct rlimit limit;
@@ -632,7 +597,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		CHECK_RETURN(rc == 0, false, "setrlimit error:%d,%s", errno, strerror(errno));
 		return true;
 	}
-	
+
 	u32 getOpenFilesLimit() {
 		struct rlimit limit;
 		int rc = getrlimit(RLIMIT_NOFILE, &limit);
@@ -691,7 +656,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		'a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z',
 		'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'
 	};
-	
+
 	//
 	// random a string
 	void randomString(std::string& result, size_t len, bool has_digit, bool has_lowercase, bool has_uppercase) {
@@ -751,7 +716,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			[SIGPWR] = "SIGPWR",
 
 			[SIGSYS] = "SIGSYS",
-//			[SIGRTMIN] = "SIGRTMIN",
+			//			[SIGRTMIN] = "SIGRTMIN",
 		};
 		return sig > 0 && sig < (int)(sizeof(__sig_string)/sizeof(__sig_string[0])) ? __sig_string[sig] : "null";
 	}
@@ -761,7 +726,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	// check a string is all numeric
 	bool isDigit(const std::string& s) {
 		return !s.empty() && std::find_if(s.begin(), 
-			s.end(), [](char c) { return !std::isdigit(c); }) == s.end();
+				s.end(), [](char c) { return !std::isdigit(c); }) == s.end();
 	}
 
 	//
@@ -781,27 +746,27 @@ BEGIN_NAMESPACE_BUNDLE {
 	//
 	// check that a string is utf8 encoding
 	bool isUTF8String(const std::string& string) {
-	    int c,i,ix,n,j;
-	    for (i = 0, ix = string.length(); i < ix; i++) {
-	        c = (unsigned char) string[i];
-	        //if (c==0x09 || c==0x0a || c==0x0d || (0x20 <= c && c <= 0x7e) ) n = 0; // is_printable_ascii
-	        if (0x00 <= c && c <= 0x7f) { n=0; }	// 0bbbbbbb
-	        else if ((c & 0xE0) == 0xC0) { n=1; }	// 110bbbbb
-	        else if ( c==0xed && i<(ix-1) && ((unsigned char)string[i+1] & 0xa0)==0xa0) { return false; }	//U+d800 to U+dfff
-	        else if ((c & 0xF0) == 0xE0) { n=2; }	// 1110bbbb
-	        else if ((c & 0xF8) == 0xF0) { n=3; }	// 11110bbb
-	        //else if (($c & 0xFC) == 0xF8) n=4; // 111110bb //byte 5, unnecessary in 4 byte UTF-8
-	        //else if (($c & 0xFE) == 0xFC) n=5; // 1111110b //byte 6, unnecessary in 4 byte UTF-8
-	        else { return false; }
-	        for (j=0; j<n && i<ix; j++) 
+		int c,i,ix,n,j;
+		for (i = 0, ix = string.length(); i < ix; i++) {
+			c = (unsigned char) string[i];
+			//if (c==0x09 || c==0x0a || c==0x0d || (0x20 <= c && c <= 0x7e) ) n = 0; // is_printable_ascii
+			if (0x00 <= c && c <= 0x7f) { n=0; }	// 0bbbbbbb
+			else if ((c & 0xE0) == 0xC0) { n=1; }	// 110bbbbb
+			else if ( c==0xed && i<(ix-1) && ((unsigned char)string[i+1] & 0xa0)==0xa0) { return false; }	//U+d800 to U+dfff
+			else if ((c & 0xF0) == 0xE0) { n=2; }	// 1110bbbb
+			else if ((c & 0xF8) == 0xF0) { n=3; }	// 11110bbb
+			//else if (($c & 0xFC) == 0xF8) n=4; // 111110bb //byte 5, unnecessary in 4 byte UTF-8
+			//else if (($c & 0xFE) == 0xFC) n=5; // 1111110b //byte 6, unnecessary in 4 byte UTF-8
+			else { return false; }
+			for (j=0; j<n && i<ix; j++) 
 			{ // n bytes matching 10bbbbbb follow ?
-	            if ((++i == ix) || (( (unsigned char)string[i] & 0xC0) != 0x80))
+				if ((++i == ix) || (( (unsigned char)string[i] & 0xC0) != 0x80))
 				{
-	                return false;
+					return false;
 				}
-	        }
-	    }
-	    return true;
+			}
+		}
+		return true;
 	}
 
 	//
@@ -818,7 +783,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		return ::__progname;
 #endif
 	}
-	
+
 	//
 	// get the complete execution of the program, like: ./bin/foo
 	const char* getProgramFullName() {
@@ -831,10 +796,9 @@ BEGIN_NAMESPACE_BUNDLE {
 #endif
 	}
 
-<<<<<<< HEAD
 	const char* getCurrentDirectory() {
 		static char __dir_buffer[PATH_MAX];
-//#if defined(_GNU_SOURCE)
+		//#if defined(_GNU_SOURCE)
 #if false
 		// absolute path name, like: /home/hushouguo/libbundle/tests 
 		const char* s = get_current_dir_name();			
@@ -855,7 +819,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 	const char* getFilename(const char* fullname) {
 		static char __filename_buffer[PATH_MAX];
-		strncpy(__filename_buffer, fullname, sizeof(__dir_buffer));
+		strncpy(__filename_buffer, fullname, sizeof(__filename_buffer));
 		return basename(__filename_buffer);
 	}
 
@@ -866,21 +830,17 @@ BEGIN_NAMESPACE_BUNDLE {
 		SafeFree(realdir);
 		return __dir_buffer;
 	}
-	
-=======
-	//
-	// bundle library init routine
->>>>>>> 9faf125dcd3593d7166812861cd86bacb4a5b3f9
+
 	bool init_runtime_environment(int argc, char* argv[]) {
 		// Verify that the version of the library that we linked against is
 		// compatible with the version of the headers we compiled against.
 		GOOGLE_PROTOBUF_VERIFY_VERSION;
-		
+
 		//
 		// parser command line arguments
 		//
 		if (!sConfig.init(argc, argv)) { return false; }
-		
+
 		//
 		// config Easylog
 		//
@@ -891,7 +851,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		Easylog::syslog()->set_tofile(GLOBAL, getProgramName());
 		Easylog::syslog()->set_tostdout(GLOBAL, sConfig.runasdaemon ? false : true);
 
-		
+
 		//
 		// libbundle
 		//
@@ -900,7 +860,7 @@ BEGIN_NAMESPACE_BUNDLE {
 #else		
 		Trace.cout("libbundle: %d.%d.%d, run as %s, %s, release", BUNDLE_VERSION_MAJOR, BUNDLE_VERSION_MINOR, BUNDLE_VERSION_PATCH, sConfig.runasdaemon ? "daemon" : "console", sConfig.guard ? "with guard" : "no guard");
 #endif
-		
+
 		//
 		// Easylog configure information
 		//
@@ -919,7 +879,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		Trace.cout("refer to config file: %s", sConfig.confile.empty() ? "not configure" : sConfig.confile.c_str());
 		sConfig.dump();
 
-		
+
 		//
 		// limit
 		//
@@ -934,14 +894,14 @@ BEGIN_NAMESPACE_BUNDLE {
 		}
 
 		Trace.cout("stack size: %u (limit.stack_size), max files: %u (limit.max_files)", getStackSizeLimit(), getOpenFilesLimit());
-		
+
 		//
 		// install signal handler
 		//
 		struct sigaction act;
-        sigemptyset(&act.sa_mask);
-        act.sa_flags = SA_INTERRUPT; //The system call that is interrupted by this signal will not be restarted automatically
-        act.sa_handler = [](int sig) {
+		sigemptyset(&act.sa_mask);
+		act.sa_flags = SA_INTERRUPT; //The system call that is interrupted by this signal will not be restarted automatically
+		act.sa_handler = [](int sig) {
 			// Don't call Non reentrant function, just like malloc, free etc, i/o function also cannot call.
 			if (sig == SIGRTMIN) {		// SIGRTMIN: Wake up thread, nothing to do
 				return;	// SIGRTMIN: #define SIGRTMIN        (__libc_current_sigrtmin ())
@@ -998,42 +958,42 @@ BEGIN_NAMESPACE_BUNDLE {
 		else {
 			Trace << "shard: not configure (shard.id)";
 		}
-		
+
 		//
 		// output 3rd libraries
 		//
 		Trace.cout("all 3rd libraries:");
-		
+
 #ifdef TC_VERSION_MAJOR		
 		Trace.cout("    tcmalloc: %d.%d%s", TC_VERSION_MAJOR, TC_VERSION_MINOR, TC_VERSION_PATCH);
 #else
 		Trace.cout("    not link tcmalloc");
 #endif
-		
+
 #ifdef LIBEVENT_VERSION
 		Trace.cout("    libevent: %s", LIBEVENT_VERSION);
 #endif
-		
+
 #ifdef ZMQ_VERSION_MAJOR
 		Trace.cout("    libzmq: %d.%d.%d", ZMQ_VERSION_MAJOR, ZMQ_VERSION_MINOR, ZMQ_VERSION_PATCH);
 #endif
-		
+
 #ifdef LUAJIT_VERSION
 		Trace.cout("    luaJIT: %s -- %s", LUAJIT_VERSION, LUAJIT_COPYRIGHT);
 #endif
-		
+
 #ifdef GOOGLE_PROTOBUF_VERSION
 		Trace.cout("    protobuf: %d, library: %d", GOOGLE_PROTOBUF_VERSION, GOOGLE_PROTOBUF_MIN_LIBRARY_VERSION);
 #endif
-		
+
 		Trace.cout("    rapidxml: 1.13");
-		
+
 #ifdef MYSQL_SERVER_VERSION		
 		Trace.cout("    mysql: %s", MYSQL_SERVER_VERSION);
 #endif
-		
+
 		Trace.cout("    gcc version: %d.%d.%d", __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__);
-		
+
 		return true;
 	}
 
@@ -1057,7 +1017,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 	static std::vector<std::string> __argv;
 
-	
+
 	//
 	// setup/reset process title
 	void setProcesstitle(int argc, char* argv[], const char* title) {

@@ -10,7 +10,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 	//
 	// get the number of cpu
-	int cpus();
+	u32 cpus();
 
 	//
 	// like ::strerror
