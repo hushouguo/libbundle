@@ -3,6 +3,8 @@
  * \brief: Created by hushouguo at 16:43:49 Sep 06 2018
  */
 
+#include <libgen.h>
+
 #include "bundle.h"
 #include "easylog/test_easylog.h"
 #include "tools/test_tools.h"
