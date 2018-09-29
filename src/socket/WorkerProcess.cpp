@@ -14,6 +14,7 @@
 BEGIN_NAMESPACE_BUNDLE {
 	WorkerProcess::WorkerProcess(u32 id, MESSAGE_SPLITER splitMessage, LockfreeQueue<Socketmessage*>* recvQueue) 
 		: Entry<u32>(id) {
+		this->_poll = new Poll(this);
 		memset(this->_sockets, 0, sizeof(this->_sockets));
 		this->_threadWorker = new std::thread([this]() {
 				this->run();
@@ -54,6 +55,9 @@ BEGIN_NAMESPACE_BUNDLE {
 				}
 				bundle::releaseMessage(msg);
 			}
+
+			// release poll object
+			SafeDelete(this->_poll);
 		}
 	}
 
@@ -61,8 +65,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		while (!this->isstop()) {
 			this->checkSocket();
 			this->handleMessage();
-			this->_poll.run(-1, [this](SOCKET s) { this->readSocket(s); }, 
-					[this](SOCKET s) { this->writeSocket(s); }, [this](SOCKET s) { this->errorSocket(s); });
+			this->_poll->run(-1);
 		}
 		Debug << "WorkerProcess: " << this->id << " thread exit, maxfd: " << this->_maxfd 
 			<< ", recvQueue: " << this->_recvQueue->size() << ", sendQueue: " << this->_sendQueue.size();
@@ -184,7 +187,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		assert(so == nullptr);		
 		this->_sockets[newfd] = so = new Socket(newfd, this);
 		so->set_listening(is_listening);
-		this->_poll.addSocket(newfd);
+		this->_poll->addSocket(newfd);
 		if (newfd > this->_maxfd) { this->_maxfd = newfd; }
 		Socketmessage* msg = allocateMessage(newfd, SM_OPCODE_ESTABLISH);
 		//
@@ -200,7 +203,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		CHECK_ALARM(so != nullptr, "socket: %d not exist", s);
 		this->_sockets[s] = nullptr;
 		SafeDelete(so);
-		this->_poll.removeSocket(s);
+		this->_poll->removeSocket(s);
 		Socketmessage* msg = allocateMessage(s, SM_OPCODE_CLOSE);
 		//
 		// throw close message

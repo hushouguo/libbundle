@@ -5,10 +5,12 @@
 
 #include "bundle.h"
 #include "Poll.h"
+#include "WorkerProcess.h"
 
 BEGIN_NAMESPACE_BUNDLE {
-	Poll::Poll() {
+	Poll::Poll(WorkerProcess* slotWorker) {
 		this->_epfd = epoll_create(NM_POLL_EVENT); /* `NM_POLL_EVENT` is just a hint for the kernel */
+		this->_slotWorker = slotWorker;
 		memset(this->_events, 0, sizeof(this->_events));
 	}
 		
@@ -46,6 +48,37 @@ BEGIN_NAMESPACE_BUNDLE {
 		int rc = epoll_ctl(this->_epfd, EPOLL_CTL_MOD, s, &ee);
 		CHECK_RETURN(rc == 0, false, "epoll_mod error: %d, %s, socket: %d", errno, strerror(errno), s);
 		return true;
+	}
+
+	void Poll::run(int milliseconds) {
+		/* -1 to block indefinitely, 0 to return immediately, even if no events are available. */
+		int numevents = ::epoll_wait(this->_epfd, this->_events, NM_POLL_EVENT, milliseconds);
+		if (numevents < 0) {
+			if (errno == EINTR) {
+				return; // wake up by signal
+			}
+			CHECK_RETURN(false, void(0), "epoll wait error:%d, %s", errno, strerror(errno));
+		}
+		for (int i = 0; i < numevents; ++i) {
+			struct epoll_event* ee = &this->_events[i];
+			if (ee->events & (EPOLLERR | EPOLLHUP)) {
+				Error.cout("fd: %d poll error or hup: %d", ee->data.fd, ee->events);
+				this->_slotWorker->errorSocket(ee->data.fd);
+			}
+			else if (ee->events & EPOLLRDHUP) {
+				Error.cout("fd: %d poll error or rdhup: %d", ee->data.fd, ee->events);
+				this->_slotWorker->errorSocket(ee->data.fd);
+			}
+			else {
+				if (ee->events & EPOLLIN) {
+					this->_slotWorker->readSocket(ee->data.fd);
+				}
+
+				if (ee->events & EPOLLOUT) {
+					this->_slotWorker->writeSocket(ee->data.fd);
+				}
+			}
+		}
 	}
 }
 

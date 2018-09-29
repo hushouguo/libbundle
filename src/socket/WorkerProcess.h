@@ -31,7 +31,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			const char* getClassName() override { return "WorkerProcess"; }
 
 		private:
-			Poll _poll;
+			Poll* _poll = nullptr;
 			Socket* _sockets[MAX_CONNECTION_FD];
 			SOCKET _maxfd = -1;
 			std::thread* _threadWorker = nullptr;
