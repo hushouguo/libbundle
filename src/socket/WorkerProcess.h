@@ -41,6 +41,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			void stop();
 			MESSAGE_SPLITER _splitMessage = nullptr;
 			size_t _totalConnections = 0;
+			size_t _opts[BUNDLE_SOL_MAX];
 
 			void run();
 			void pushMessage(Socketmessage*);

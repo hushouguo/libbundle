@@ -28,6 +28,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		SM_OPCODE_CLOSE 		=	0x3,
 		SM_OPCODE_NEW_SOCKET	=	0x4,
 		SM_OPCODE_NEW_LISTENING	=	0x5,
+		SM_OPCODE_SOL			=	0x6,
 	};
 
 #pragma pack(push, 1)
