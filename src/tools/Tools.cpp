@@ -465,9 +465,11 @@ BEGIN_NAMESPACE_BUNDLE {
 		while (i < fullPath.length()) {
 			std::string::size_type head = fullPath.find('/', i);
 			std::string dir;
-			dir.assign(fullPath, 0, head);			
-			int rc = mkdir(dir.c_str(), S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
-			CHECK_RETURN(rc == 0 || errno == EEXIST, false, "mkdir: %s error: %d, %s", dir.c_str(), errno, strerror(errno));			
+			dir.assign(fullPath, 0, head == std::string::npos ? fullPath.length() : head);
+			if (!dir.empty()) {
+				int rc = mkdir(dir.c_str(), S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
+				CHECK_RETURN(rc == 0 || errno == EEXIST, false, "mkdir:%s error:%d,%s", dir.c_str(), errno, strerror(errno));
+			}
 			if (head == std::string::npos) {
 				break;
 			}

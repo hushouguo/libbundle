@@ -9,7 +9,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	bool Config::loadconf(const char* xmlfile) {
 		XmlParser xmlParser;
 		if (!xmlParser.open(xmlfile)) {
-			fprintf(stderr, "loadconf: %s failure", xmlfile);
+			fprintf(stderr, "loadconf: %s failure\n", xmlfile);
 			return false;
 		}
 
