@@ -9,11 +9,13 @@
 #define COUNT_MESSAGE_SPAN	60
 
 BEGIN_NAMESPACE_BUNDLE {
+	class WorkerProcess;
 	class Socket {
 		public:
-			Socket(SOCKET connfd, MESSAGE_SPLITER splitMessage) : _fd(connfd) {
+			Socket(SOCKET connfd, WorkerProcess* slotWorker) : _fd(connfd) {
 				nonblocking(this->fd());
-				this->_splitMessage = splitMessage;
+				assert(slotWorker);
+				this->_slotWorker = slotWorker;
 			}
 
 			~Socket() {
@@ -39,11 +41,11 @@ BEGIN_NAMESPACE_BUNDLE {
 			bool sendMessage(const Socketmessage* msg);
 			
 		private:
-			SOCKET _fd = BUNDLE_INVALID_SOCKET;
+			SOCKET _fd = -1;
 			bool _is_listening = false;
 			ByteBuffer _rbuffer, _wbuffer;
 			std::list<const Socketmessage*> _sendlist;
-			MESSAGE_SPLITER _splitMessage = nullptr;
+			WorkerProcess* _slotWorker = nullptr;
 			bool splitMessage(Socketmessage*& msg);
 			
 			u64 _lastSecond = timeSecond();

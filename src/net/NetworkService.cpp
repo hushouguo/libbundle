@@ -123,8 +123,8 @@ BEGIN_NAMESPACE_BUNDLE {
 				else {
 					NetworkTask* task = FindOrNull(this->_tasks, s);
 					if (task && this->_msgParser) {
-						const Netmessage* netmsg = (const Netmessage *) messagePayload(msg);
-						size_t payload_len = messagePayloadLength(msg);
+						const Netmessage* netmsg = (const Netmessage *) GET_MESSAGE_PAYLOAD(msg);
+						size_t payload_len = GET_MESSAGE_PAYLOAD_LENGTH(msg);
 						assert(payload_len == netmsg->len);
 						rc = this->_msgParser(this, task, netmsg);
 					}
@@ -141,7 +141,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	void NetworkService::releaseMessage(const Netmessage* netmsg) {
-		const Socketmessage* msg = getMessage(netmsg);
+		const Socketmessage* msg = GET_MESSAGE_BY_PAYLOAD(netmsg);
 		bundle::releaseMessage(msg);
 	}
 

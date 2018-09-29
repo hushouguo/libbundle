@@ -23,6 +23,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			void pushMessage(SOCKET, const void*, size_t);
 
 			inline size_t totalConnections() { return this->_totalConnections; }
+			inline const MESSAGE_SPLITER& splitMessage() { return this->_splitMessage; }
 			
 		public:
 			WorkerProcess(u32 id, MESSAGE_SPLITER splitMessage, LockfreeQueue<Socketmessage*>* recvQueue);
@@ -32,7 +33,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		private:
 			Poll _poll;
 			Socket* _sockets[MAX_CONNECTION_FD];
-			SOCKET _maxfd = BUNDLE_INVALID_SOCKET;
+			SOCKET _maxfd = -1;
 			std::thread* _threadWorker = nullptr;
 			LockfreeQueue<Socketmessage*> _sendQueue, *_recvQueue = nullptr;
 			bool _stop = false;

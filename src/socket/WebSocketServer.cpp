@@ -45,7 +45,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			SOCKET fd() override {	return this->_socketServer->fd(); }
 			bool start(const char* address, int port) override { return this->_socketServer->start(address, port); }
 			void stop() override { this->_socketServer->stop(); }
-			const Socketmessage* receiveMessage(SOCKET& s, bool& establish, bool& close) override;
+			const Socketmessage* receiveMessage() override;
 			void sendMessage(SOCKET s, const void*, size_t) override;
 			//void sendMessage(SOCKET s, const Socketmessage*) override;
 			void close(SOCKET s) override { this->_socketServer->close(s); }
@@ -131,18 +131,18 @@ BEGIN_NAMESPACE_BUNDLE {
 
 	/////////////////////////////////////////////////////////////////
 	
-	const Socketmessage* WebSocketServerInternal::receiveMessage(SOCKET& s, bool& establish, bool& close) {
-        Socketmessage* msg = (Socketmessage *) this->_socketServer->receiveMessage(s, establish, close);
+	const Socketmessage* WebSocketServerInternal::receiveMessage() {
+        Socketmessage* msg = (Socketmessage *) this->_socketServer->receiveMessage();
         if (!msg) {
         	return nullptr;
         }
 
-        if (establish) {
+        if (IS_ESTABLISH_MESSAGE(msg)) {
         	bundle::releaseMessage(msg);
         	return nullptr; // Websocket needs to wait for the handshake to establish.
         }
 
-        if (close) {
+        if (IS_CLOSE_MESSAGE(msg)) {
         	return msg;	// disconnect
         }
 

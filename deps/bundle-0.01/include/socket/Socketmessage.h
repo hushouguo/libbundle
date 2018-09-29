@@ -11,9 +11,13 @@ BEGIN_NAMESPACE_BUNDLE {
 	Socketmessage* allocateMessage(size_t);
 	Socketmessage* allocateMessage(size_t, const void*);
 	void releaseMessage(const Socketmessage*);
-	const void* messagePayload(const Socketmessage*);
-	size_t messagePayloadLength(const Socketmessage*);
-	const Socketmessage* getMessage(const void*);
+	
+	SOCKET GET_MESSAGE_SOCKET(const Socketmessage*);
+	const void* GET_MESSAGE_PAYLOAD(const Socketmessage*);
+	size_t GET_MESSAGE_PAYLOAD_LENGTH(const Socketmessage*);
+	const Socketmessage* GET_MESSAGE_BY_PAYLOAD(const void*);
+	bool IS_ESTABLISH_MESSAGE(const Socketmessage*);
+	bool IS_CLOSE_MESSAGE(const Socketmessage*);
 }
 
 #endif

@@ -196,28 +196,46 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
     Socketmessage* allocateMessage(size_t payload_len) {
-		return allocateMessage(BUNDLE_INVALID_SOCKET, SM_OPCODE_MESSAGE, payload_len);
+		return allocateMessage(-1, SM_OPCODE_MESSAGE, payload_len);
 	}
 
     Socketmessage* allocateMessage(size_t payload_len, const void* payload) {
-		return allocateMessage(BUNDLE_INVALID_SOCKET, SM_OPCODE_MESSAGE, payload, payload_len);
+		return allocateMessage(-1, SM_OPCODE_MESSAGE, payload, payload_len);
 	}
 
-    const void* messagePayload(const Socketmessage* msg) {
+    const void* GET_MESSAGE_PAYLOAD(const Socketmessage* msg) {
 		assert(msg);
 		assert(msg->magic == MAGIC);
 		return msg->payload;
 	}
 
-    size_t messagePayloadLength(const Socketmessage* msg) {
+    size_t GET_MESSAGE_PAYLOAD_LENGTH(const Socketmessage* msg) {
 		assert(msg);
 		assert(msg->magic == MAGIC);
 		return msg->payload_len;
 	}
 
-	const Socketmessage* getMessage(const void* payload) {
+	const Socketmessage* GET_MESSAGE_BY_PAYLOAD(const void* payload) {
 		const Socketmessage* msg = (const Socketmessage *) ((Byte*) payload - offsetof(Socketmessage, payload));
 		assert(msg->magic == MAGIC);
 		return msg;
+	}
+
+	SOCKET GET_MESSAGE_SOCKET(const Socketmessage* msg) {
+		assert(msg);
+		assert(msg->magic == MAGIC);
+		return msg->s;
+	}
+
+	bool IS_ESTABLISH_MESSAGE(const Socketmessage* msg) {
+		assert(msg);
+		assert(msg->magic == MAGIC);
+		return msg->opcode == SM_OPCODE_ESTABLISH;
+	}
+	
+	bool IS_CLOSE_MESSAGE(const Socketmessage* msg) {
+		assert(msg);
+		assert(msg->magic == MAGIC);
+		return msg->opcode == SM_OPCODE_CLOSE;
 	}
 }

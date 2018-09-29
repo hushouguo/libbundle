@@ -246,7 +246,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			Socketmessage* msg = this->_sendQueue.pop_front();
 			assert(msg);
 			assert(msg->magic == MAGIC);
-			if (msg->s == BUNDLE_BROADCAST_SOCKET) {
+			if (msg->s == -1) {
 				this->multisendMessage(msg);
 			}
 			else {

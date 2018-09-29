@@ -185,7 +185,7 @@ void test_net() {
 			}
 			else {
 				fprintf(stderr, "receive Socketmessage: %d, payload:%s, payload_len:%ld\n", 
-						n, (const char*)messagePayload(msg), messagePayloadLength(msg));
+						n, (const char*) GET_MESSAGE_PAYLOAD(msg), GET_MESSAGE_PAYLOAD_LENGTH(msg));
 				++n;
 			}
 			bundle::releaseMessage(msg);

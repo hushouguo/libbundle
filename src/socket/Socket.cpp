@@ -9,9 +9,9 @@
 
 BEGIN_NAMESPACE_BUNDLE {
 	bool Socket::splitMessage(Socketmessage*& msg) {
-		CHECK_RETURN(this->_splitMessage != nullptr, false, "splitMessage unavailable");
+		CHECK_RETURN(this->_slotWorker != nullptr, false, "splitMessage unavailable");
 		msg = nullptr;
-		int rc = this->_splitMessage(this->_rbuffer.rbuffer(), this->_rbuffer.size());
+		int rc = this->_slotWorker->splitMessage()(this->_rbuffer.rbuffer(), this->_rbuffer.size());
 		if (rc == 0) {
 			return true; 	// incomplete message
 		}
@@ -143,10 +143,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	void Socket::close() {
-		if (this->_fd != BUNDLE_INVALID_SOCKET) {
-			::close(this->_fd);
-			this->_fd = BUNDLE_INVALID_SOCKET;
-		}
+		SafeClose(this->_fd);
 	}	
 }
 

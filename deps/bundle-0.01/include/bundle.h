@@ -214,8 +214,6 @@ using ssize_t	=						int;
 #else
 #define SOCKET							int
 #endif
-#define BUNDLE_INVALID_SOCKET			-1
-#define BUNDLE_BROADCAST_SOCKET			BUNDLE_INVALID_SOCKET
 
 //
 // return value:

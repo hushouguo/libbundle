@@ -7,7 +7,7 @@
 
 BEGIN_NAMESPACE_BUNDLE {			
 	SOCKET NetworkClient::fd() {
-		return this->socketClient() ? this->socketClient()->fd() : BUNDLE_INVALID_SOCKET;
+		return this->socketClient() ? this->socketClient()->fd() : -1;
 	}
 
 	void NetworkClient::sendMessage(const Netmessage* netmsg) {
@@ -71,8 +71,8 @@ BEGIN_NAMESPACE_BUNDLE {
 				}
 				else {
 					if (this->_msgParser) {
-						const Netmessage* netmsg = (const Netmessage *) messagePayload(msg);
-						size_t payload_len = messagePayloadLength(msg);
+						const Netmessage* netmsg = (const Netmessage *) GET_MESSAGE_PAYLOAD(msg);
+						size_t payload_len = GET_MESSAGE_PAYLOAD_LENGTH(msg);
 						assert(payload_len == netmsg->len);
 						rc = this->_msgParser(this, netmsg);
 					}
@@ -89,7 +89,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	void NetworkClient::releaseMessage(const Netmessage* netmsg) {
-		const Socketmessage* msg = getMessage(netmsg);
+		const Socketmessage* msg = GET_MESSAGE_BY_PAYLOAD(netmsg);
 		bundle::releaseMessage(msg);
 	}
 

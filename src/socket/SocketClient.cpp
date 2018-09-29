@@ -26,7 +26,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			inline bool isstop() { return this->_stop; }
 			bool active() override;
 			inline bool connect_in_progress() { return this->_connect_in_progress; }
-			const Socketmessage* receiveMessage(bool& establish, bool& close) override;			
+			const Socketmessage* receiveMessage() override;			
 			void sendMessage(const void* payload, size_t payload_len) override;
 			void sendMessage(const Socketmessage*) override;
 
@@ -108,22 +108,20 @@ BEGIN_NAMESPACE_BUNDLE {
 
 	//////////////////////////////////////////////////////////////////////////////////
 	
-	const Socketmessage* SocketClientInternal::receiveMessage(bool& establish, bool& close) {
-		establish = close = false;
+	const Socketmessage* SocketClientInternal::receiveMessage() {
 		while (!this->_readQueue.empty()) {
 			Socketmessage* msg = this->_readQueue.pop_front();
 			assert(msg);
 			assert(msg->magic == MAGIC);
-			assert(msg->s != BUNDLE_INVALID_SOCKET);
+			assert(msg->s != -1);
 			switch (msg->opcode) {
-				case SM_OPCODE_ESTABLISH: establish = true; return msg;
 				case SM_OPCODE_CLOSE:
 					if (msg->s == this->fd()) {
 						Debug << "SocketClient: " << this->fd() << " lost, retry connect";
 						this->_active = false;
 						this->connectAsync();
 					}
-					close = true; return msg;
+				case SM_OPCODE_ESTABLISH:
 				case SM_OPCODE_MESSAGE: return msg;
 
 				default:

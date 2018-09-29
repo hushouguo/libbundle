@@ -25,7 +25,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			bool start(const char* address, int port) override;
 			void stop() override;
 			inline bool isstop() { return this->_stop; }
-			const Socketmessage* receiveMessage(SOCKET& s, bool& establish, bool& close) override;
+			const Socketmessage* receiveMessage() override;
 			void sendMessage(SOCKET s, const void*, size_t) override;
 			void sendMessage(SOCKET s, const Socketmessage*) override;
 			void close(SOCKET s) override;
@@ -39,7 +39,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			std::vector<WorkerProcess*> _processes;
 			WorkerProcess* getWorkerProcess(SOCKET);
 
-			SOCKET _fd_listening = BUNDLE_INVALID_SOCKET;
+			SOCKET _fd_listening = -1;
 			bool _stop = true;
 			size_t _opts[BUNDLE_SOL_MAX];
 
@@ -57,9 +57,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	bool SocketServerInternal::start(const char* address, int port) {
 		CHECK_RETURN(this->_stop, false, "SocketServer is running, stop it at first!");
 		this->_stop = false;
-		if (this->_fd_listening != BUNDLE_INVALID_SOCKET) {
-			::close(this->_fd_listening);
-		}
+		SafeClose(this->_fd_listening);
 
 		this->_fd_listening = ::socket(AF_INET, SOCK_STREAM, 0);
 		CHECK_RETURN(this->_fd_listening >= 0, false, "create socket failure: %d, %s", errno, strerror(errno));
@@ -111,23 +109,20 @@ BEGIN_NAMESPACE_BUNDLE {
 	////////////////////////////////////////////////////////////////////////////////////////
 
 	
-	const Socketmessage* SocketServerInternal::receiveMessage(SOCKET& s, bool& establish, bool& close) {
-		s = BUNDLE_INVALID_SOCKET;
-		establish = close = false;
+	const Socketmessage* SocketServerInternal::receiveMessage() {
 		while (!this->_readQueue.empty()) {
 			Socketmessage* msg = this->_readQueue.pop_front();
 			assert(msg);
 			assert(msg->magic == MAGIC);
-			assert(msg->s != BUNDLE_INVALID_SOCKET);
-			s = msg->s;
+			assert(msg->s != -1);
 			switch (msg->opcode) {
-				case SM_OPCODE_ESTABLISH: establish = true; return msg;
-				case SM_OPCODE_CLOSE: close = true; return msg;
+				case SM_OPCODE_ESTABLISH:
+				case SM_OPCODE_CLOSE:
 				case SM_OPCODE_MESSAGE: return msg;
 				case SM_OPCODE_NEW_SOCKET:
 					if (true) {
 						WorkerProcess* slot = this->getWorkerProcess(msg->s);
-						slot->pushMessage(s, msg);
+						slot->pushMessage(msg->s, msg);
 					}
 					break;
 				default:
@@ -138,19 +133,19 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	void SocketServerInternal::close(SOCKET s) {
-		assert(s != BUNDLE_INVALID_SOCKET);
+		assert(s != -1);
 		WorkerProcess* slot = this->getWorkerProcess(s);
 		slot->closeSocket(s);
 	}
 	
 	void SocketServerInternal::sendMessage(SOCKET s, const void* payload, size_t payload_len) {
-		assert(s != BUNDLE_INVALID_SOCKET);
+		assert(s != -1);
 		WorkerProcess* slot = this->getWorkerProcess(s);
 		slot->pushMessage(s, payload, payload_len);
 	}
 
 	void SocketServerInternal::sendMessage(SOCKET s, const Socketmessage* msg) {
-		assert(s != BUNDLE_INVALID_SOCKET);
+		assert(s != -1);
 		WorkerProcess* slot = this->getWorkerProcess(s);
 		slot->pushMessage(s, (Socketmessage*) msg);
 	}
