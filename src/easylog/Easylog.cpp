@@ -523,7 +523,7 @@ BEGIN_NAMESPACE_BUNDLE {
 #endif
 
 	bool EasylogInternal::set_destination(std::string dir) {
-		const char* realdir = absoluteDirectory(dir.c_str());
+		char* realdir = absoluteDirectory(dir.c_str());
 		CHECK_RETURN(realdir, false, "dir: `%s` is not valid directory", dir.c_str());
 		if (!existDir(realdir) && !createDirectory(realdir)) {
 			return false;

@@ -664,7 +664,7 @@ dont_need_mkdir:
 
 	const char* getFilename(const char* fullname) {
 		static char __filename_buffer[PATH_MAX];
-		strncpy(__filename_buffer, fullname, sizeof(__filename_buffer));
+		strncpy(__filename_buffer, fullname, sizeof(__dir_buffer));
 		return basename(__filename_buffer);
 	}
 
