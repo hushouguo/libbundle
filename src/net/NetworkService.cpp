@@ -97,18 +97,17 @@ BEGIN_NAMESPACE_BUNDLE {
 	bool NetworkService::update() {
 		CHECK_RETURN(this->_socketServer, false, "please call `start` to init service");
 		while (!this->isstop()) {
-			SOCKET s = -1;
-			bool is_establish = false, is_close = false;
-			const Socketmessage* msg = this->_socketServer->receiveMessage(s, is_establish, is_close);
+			const Socketmessage* msg = this->_socketServer->receiveMessage();
+			SOCKET s = GET_MESSAGE_SOCKET(msg);
 			if (msg) {
 				bool rc = true;
-				if (is_establish) {
+				if (IS_ESTABLISH_MESSAGE(msg)) {
 					NetworkTask* task = this->spawnConnection(s);
 					if (this->_establishConnection) {
 						this->_establishConnection(this, task);
 					}
 				}
-				else if (is_close) {
+				else if (IS_CLOSE_MESSAGE(msg)) {
 					NetworkTask* task = FindOrNull(this->_tasks, s);
 					if (task) {
 						if (this->_lostConnection) {

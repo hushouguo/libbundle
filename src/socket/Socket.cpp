@@ -6,6 +6,8 @@
 #include "bundle.h"
 #include "Helper.h"
 #include "Socket.h"
+#include "Poll.h"
+#include "WorkerProcess.h"
 
 BEGIN_NAMESPACE_BUNDLE {
 	bool Socket::splitMessage(Socketmessage*& msg) {

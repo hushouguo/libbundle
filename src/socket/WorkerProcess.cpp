@@ -182,7 +182,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	void WorkerProcess::newSocket(SOCKET newfd, bool is_listening) {
 		Socket* so = GET_SOCKET(newfd);
 		assert(so == nullptr);		
-		this->_sockets[newfd] = so = new Socket(newfd, this->_splitMessage);		
+		this->_sockets[newfd] = so = new Socket(newfd, this);
 		so->set_listening(is_listening);
 		this->_poll.addSocket(newfd);
 		if (newfd > this->_maxfd) { this->_maxfd = newfd; }

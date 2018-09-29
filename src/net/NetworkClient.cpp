@@ -55,16 +55,15 @@ BEGIN_NAMESPACE_BUNDLE {
 	bool NetworkClient::update() {
 		CHECK_RETURN(this->_socketClient, false, "please call `connect` to init client");
 		while (!this->isstop()) {
-			bool is_establish = false, is_close = false;
-			const Socketmessage* msg = this->_socketClient->receiveMessage(is_establish, is_close);
+			const Socketmessage* msg = this->_socketClient->receiveMessage();
 			if (msg) {
 				bool rc = true;
-				if (is_establish) {
+				if (IS_ESTABLISH_MESSAGE(msg)) {
 					if (this->_establishConnection) {
 						this->_establishConnection(this);
 					}
 				}
-				else if (is_close) {
+				else if (IS_CLOSE_MESSAGE(msg)) {
 					if (this->_lostConnection) {
 						this->_lostConnection(this);
 					}

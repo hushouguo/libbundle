@@ -34,14 +34,12 @@ void createServer(u32 msgsize) {
 	auto runnable = []() {
 		u32 n = 0;
 		while (n < N) {
-			SOCKET s = -1;
-			bool establish = false, close = false;
-			const Socketmessage* msg = ss->receiveMessage(s, establish, close);
+			const Socketmessage* msg = ss->receiveMessage();
 			if (msg) {
-				if (establish) {
+				if (IS_ESTABLISH_MESSAGE(msg)) {
 					//fprintf(stderr, "SocketServer: establish: %d\n", s);
 				}
-				else if (close) {
+				else if (IS_CLOSE_MESSAGE(msg)) {
 					//fprintf(stderr, "SocketServer: lostConnection: %d\n", s);
 				}
 				else {
@@ -129,14 +127,12 @@ void test_net3() {
 	auto runnable = []() {
 		u32 n = 0;
 		while (!sConfig.halt) {
-			SOCKET s = -1;
-			bool establish = false, close = false;
-			const Socketmessage* msg = ss->receiveMessage(s, establish, close);
+			const Socketmessage* msg = ss->receiveMessage();
 			if (msg) {
-				if (establish) {
+				if (IS_ESTABLISH_MESSAGE(msg)) {
 					//fprintf(stderr, "SocketServer: establish: %d\n", s);
 				}
-				else if (close) {
+				else if (IS_CLOSE_MESSAGE(msg)) {
 					//fprintf(stderr, "SocketServer: lostConnection: %d\n", s);
 				}
 				else {
@@ -173,14 +169,12 @@ void test_net() {
 	assert(rc);
 
 	auto doServerMessage = []() {
-		SOCKET s = -1;
-		bool establish = false, close = false;
-		const Socketmessage* msg = ss->receiveMessage(s, establish, close);
+		const Socketmessage* msg = ss->receiveMessage();
 		if (msg) {
-			if (establish) {
+			if (IS_ESTABLISH_MESSAGE(msg)) {
 				//fprintf(stderr, "SocketServer: establish: %d\n", s);
 			}
-			else if (close) {
+			else if (IS_CLOSE_MESSAGE(msg)) {
 				//fprintf(stderr, "SocketServer: lostConnection: %d\n", s);
 			}
 			else {
@@ -193,13 +187,12 @@ void test_net() {
 	};
 
 	auto doClientMessage = []() {
-		bool establish = false, close = false;
-		const Socketmessage* msg = cs->receiveMessage(establish, close);
+		const Socketmessage* msg = cs->receiveMessage();
 		if (msg) {
-			if (establish) {
+			if (IS_ESTABLISH_MESSAGE(msg)) {
 				fprintf(stderr, "SocketClient: establish\n");
 			}
-			else if (close) {
+			else if (IS_CLOSE_MESSAGE(msg)) {
 				fprintf(stderr, "SocketClient: lostConnection\n");
 			}
 			else {

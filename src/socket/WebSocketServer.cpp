@@ -137,6 +137,8 @@ BEGIN_NAMESPACE_BUNDLE {
         	return nullptr;
         }
 
+		SOCKET s = GET_MESSAGE_SOCKET(msg);
+
         if (IS_ESTABLISH_MESSAGE(msg)) {
         	bundle::releaseMessage(msg);
         	return nullptr; // Websocket needs to wait for the handshake to establish.
@@ -151,7 +153,6 @@ BEGIN_NAMESPACE_BUNDLE {
 			int len = this->parse_handshake_request(msg->payload, msg->payload_len, Sec_WebSocket_Key);
 			assert(len > 0 && size_t(len) == msg->payload_len);
 			this->send_handshake_response(s, Sec_WebSocket_Key);
-			establish = true, close = false;
 			return msg;
 		}
 
