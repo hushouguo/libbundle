@@ -21,6 +21,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			void closeSocket(SOCKET);
 			void pushMessage(SOCKET, Socketmessage*);
 			void pushMessage(SOCKET, const void*, size_t);
+			bool setsockopt(int opt, const void* optval, size_t optlen); 
 
 			inline size_t totalConnections() { return this->_totalConnections; }
 			inline const MESSAGE_SPLITER& splitMessage() { return this->_splitMessage; }

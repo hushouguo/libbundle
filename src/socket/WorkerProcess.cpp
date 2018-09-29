@@ -21,6 +21,7 @@ BEGIN_NAMESPACE_BUNDLE {
 				});
 		this->_splitMessage = splitMessage;
 		this->_recvQueue = recvQueue;
+		memset(this->_opts, 0, sizeof(this->_opts));
 	}
 
 	WorkerProcess::~WorkerProcess() {
@@ -98,6 +99,16 @@ BEGIN_NAMESPACE_BUNDLE {
 		assert(payload_len > 0);
 		Socketmessage* msg = allocateMessage(s, SM_OPCODE_MESSAGE, payload, payload_len);
 		this->pushMessage(msg);	
+	}
+
+	bool WorkerProcess::setsockopt(int opt, const void* optval, size_t optlen) {
+		CHECK_RETURN(opt > 0 && opt < BUNDLE_SOL_MAX, false, "illegal opt: %d", opt);
+		CHECK_RETURN(optval, false, "illegal optval");
+		CHECK_RETURN(optlen <= sizeof(size_t), false, "illegal optlen");
+		size_t value = 0;
+		memcpy(&value, optval, optlen);
+		Socketmessage* msg = allocateMessage(opt, SM_OPCODE_SOL, value);
+		this->pushMessage(msg);
 	}
 	
 	void WorkerProcess::readSocket(SOCKET s) {
@@ -184,7 +195,12 @@ BEGIN_NAMESPACE_BUNDLE {
 	//
 	void WorkerProcess::newSocket(SOCKET newfd, bool is_listening) {
 		Socket* so = GET_SOCKET(newfd);
-		assert(so == nullptr);		
+		assert(so == nullptr);
+		if (this->_opts[BUNDLE_SOL_MAXSIZE] != 0 && this->_totalConnections >= this->_opts[BUNDLE_SOL_MAXSIZE]) {
+			// exceeding this maximum connections limit
+			SafeClose(newfd);
+			return;
+		}		
 		this->_sockets[newfd] = so = new Socket(newfd, this);
 		so->set_listening(is_listening);
 		this->_poll->addSocket(newfd);
@@ -228,8 +244,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		assert(msg);
 		assert(msg->payload_len > 0);
 		for (SOCKET s = 0; s <= this->_maxfd; ++s) {
-			ASSERT_SOCKET(s);
-			Socket* so = this->_sockets[s];
+			Socket* so = GET_SOCKET(s);
 			if (so) {
 				Socketmessage* newmsg = allocateMessage(s, msg->opcode, msg->payload, msg->payload_len);
 				this->sendMessage(s, newmsg);
@@ -242,6 +257,33 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	void WorkerProcess::checkSocket() {
+		if (this->_opts[BUNDLE_SOL_SILENCE_SECOND] > 0 || this->_opts[BUNDLE_SOL_THRESHOLD_MESSAGE] > 0) {
+			u64 nowtime = timeSecond();
+			for (SOCKET s = 0; s <= this->_maxfd; ++s) {
+				Socket* so = GET_SOCKET(s);
+				if (!so) {
+					continue;
+				}
+		
+				if (this->_opts[BUNDLE_SOL_SILENCE_SECOND] > 0 && (nowtime - so->lastSecond()) >= this->_opts[BUNDLE_SOL_SILENCE_SECOND]) {
+					Alarm.cout("Connection:%d, No messages has been received in the last %ld seconds, allow: (%ld)", s, nowtime - so->lastSecond(), this->_opts[BUNDLE_SOL_SILENCE_SECOND]);
+					//
+					// silence time too long
+					//
+					this->removeSocket(s, "SilenceExpire");
+				}
+				else if (this->_opts[BUNDLE_SOL_THRESHOLD_MESSAGE] > 0 && this->_opts[BUNDLE_SOL_THRESHOLD_INTERVAL] > 0) {
+					u32 total = so->recentMessage(this->_opts[BUNDLE_SOL_THRESHOLD_INTERVAL]);
+					if (total > this->_opts[BUNDLE_SOL_THRESHOLD_MESSAGE]) {
+						Alarm.cout("Connection:%d, More than %d(%ld) messages have been received in the last %ld seconds", s, total, this->_opts[BUNDLE_SOL_THRESHOLD_MESSAGE], this->_opts[BUNDLE_SOL_THRESHOLD_INTERVAL]);
+						//
+						// send message too fast
+						//
+						this->removeSocket(s, "MessageOverflow");
+					}
+				}
+			}
+		}
 	}
 
 	void WorkerProcess::handleMessage() {
@@ -283,7 +325,12 @@ BEGIN_NAMESPACE_BUNDLE {
 						this->newSocket(msg->s, true);
 						bundle::releaseMessage(msg);
 						break;
-						
+
+					case SM_OPCODE_SOL:
+						this->_opts[msg->s] = msg->payload_len;
+						bundle::releaseMessage(msg);
+						break;
+					
 					default:
 					case SM_OPCODE_ESTABLISH: assert(false); break;
 				}					

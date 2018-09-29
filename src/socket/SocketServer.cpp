@@ -101,8 +101,21 @@ BEGIN_NAMESPACE_BUNDLE {
 
 	WorkerProcess* SocketServerInternal::getWorkerProcess(SOCKET s) {
 		assert(this->_processes.empty() == false);
+#if false		
+		WorkerProcess* slotWorker = nullptr;
+		size_t weight = 0;
+		for (auto slot : this->_processes) {
+			if (!slotWorker || slot->totalConnections() < weight) {
+				slotWorker = slot;
+				weight = slot->totalConnections();
+			}
+		}
+		assert(slotWorker);
+		return slotWorker;
+#else		
 		return this->_processes.size() == 1 ? this->_processes[0] 
 					: this->_processes[(s % (this->_processes.size() - 1)) + 1];
+#endif					
 	}
 
 
@@ -181,7 +194,10 @@ BEGIN_NAMESPACE_BUNDLE {
 		CHECK_RETURN(opt > 0 && opt < BUNDLE_SOL_MAX, false, "illegal opt: %d", opt);
 		CHECK_RETURN(optval, false, "illegal optval");
 		CHECK_RETURN(optlen <= sizeof(size_t), false, "illegal optlen");
-		memcpy(&this->_opts[opt], optval, optlen);
+		memcpy(optval, &this->_opts[opt], optlen);
+		for (auto slot : this->_processes) {
+			slot->setsockopt(opt, optval, optlen);
+		}
 		return true;
 	}
 	
