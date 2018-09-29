@@ -109,6 +109,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		memcpy(&value, optval, optlen);
 		Socketmessage* msg = allocateMessage(opt, SM_OPCODE_SOL, value);
 		this->pushMessage(msg);
+		return true;
 	}
 	
 	void WorkerProcess::readSocket(SOCKET s) {

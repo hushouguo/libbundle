@@ -194,7 +194,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		CHECK_RETURN(opt > 0 && opt < BUNDLE_SOL_MAX, false, "illegal opt: %d", opt);
 		CHECK_RETURN(optval, false, "illegal optval");
 		CHECK_RETURN(optlen <= sizeof(size_t), false, "illegal optlen");
-		memcpy(optval, &this->_opts[opt], optlen);
+		memcpy(&this->_opts[opt], optval, optlen);
 		for (auto slot : this->_processes) {
 			slot->setsockopt(opt, optval, optlen);
 		}
