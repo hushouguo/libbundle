@@ -176,7 +176,7 @@
 #include "evhttp.h"
 
 // libcurl-7.58.0
-#include "curl/curl.h"
+#include <curl/curl.h>
 
 // tcmalloc-2.6.1
 #include "gperftools/tcmalloc.h"

@@ -9,7 +9,6 @@ set(RAPIDXML_DIR ${DEPS_DIR}/rapidxml-1.13)
 set(RAPIDJSON_DIR ${DEPS_DIR}/rapidjson-1.1.0)
 set(MYSQL_DIR ${DEPS_DIR}/mysql-5.6.37)
 set(LIBEVENT_DIR ${DEPS_DIR}/libevent-2.1.8)
-set(CURL_DIR ${DEPS_DIR}/curl-7.58.0)
 
 ADD_SUBDIRECTORY(src)
 ADD_SUBDIRECTORY(server/gatewayserver)

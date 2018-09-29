@@ -1040,7 +1040,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	static size_t curlWriteCallback(const char* ptr, size_t size, size_t nmemb, CurlContext* context) {
 		void* userdata = context->userdata;
 		std::function<void(std::string, std::string, void*)> func = context->callback;
-		SafeDelete(context)
+		SafeDelete(context);
 
 		Debug << "curlWriteCallback: " << ptr;
 	
@@ -1083,7 +1083,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		CURL* easy_handle = curl_easy_init();
 		CHECK_RETURN(easy_handle, false, "curl_easy_init failure");
 		CurlContext* context = new CurlContext(userdata, func);
-		curl_easy_setopt(easy_handle, CURLOPT_URL, url.str());
+		curl_easy_setopt(easy_handle, CURLOPT_URL, url.str().c_str());
 		curl_easy_setopt(easy_handle, CURLOPT_SSL_VERIFYPEER, true);
 		curl_easy_setopt(easy_handle, CURLOPT_READFUNCTION, nullptr);  
 		curl_easy_setopt(easy_handle, CURLOPT_WRITEFUNCTION, curlWriteCallback);

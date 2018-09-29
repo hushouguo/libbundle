@@ -16,6 +16,7 @@ include_directories(${TCMALLOC_DIR}/include)
 include_directories(${MYSQL_DIR}/include)
 include_directories(${RAPIDXML_DIR})
 include_directories(${RAPIDJSON_DIR})
+include_directories(${LIBEVENT_DIR}/include)
 
 aux_source_directory(src src)
 
@@ -26,7 +27,7 @@ set(CMAKE_EXE_LINKER_FLAGS "-static-libgcc -static-libstdc++")
 
 add_executable(${target} ${src})
 
-target_link_libraries(${target} rt dl pthread)
+target_link_libraries(${target} rt dl curl pthread)
 target_link_libraries(${target} ${BUNDLE_DIR}/lib/libbundle.a)
 target_link_libraries(${target} ${PROTOBUF_DIR}/lib/libprotobuf.a)
 target_link_libraries(${target} ${TCMALLOC_DIR}/lib/libtcmalloc_minimal.a)
