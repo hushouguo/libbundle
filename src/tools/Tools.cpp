@@ -687,7 +687,6 @@ dont_need_mkdir:
         sigemptyset(&act.sa_mask);
         act.sa_flags = SA_INTERRUPT; //The system call that is interrupted by this signal will not be restarted automatically
         act.sa_handler = [](int sig) {
-			fprintf(stderr, "signal: %d\n", sig);
 			// Don't call Non reentrant function, just like malloc, free etc, i/o function also cannot call.
 			if (sig == SIGRTMIN) {		// SIGRTMIN: Wake up thread, nothing to do
 				return;	// SIGRTMIN: #define SIGRTMIN        (__libc_current_sigrtmin ())

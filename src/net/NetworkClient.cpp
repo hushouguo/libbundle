@@ -42,7 +42,7 @@ BEGIN_NAMESPACE_BUNDLE {
 				return len < sizeof(Netmessage) || len < netmsg->len ? 0 : netmsg->len;
 				});
 
-		bool rc = this->_socketClient->connect(address, port, true);
+		bool rc = this->_socketClient->connect(address, port, 10);
 		if (!rc) {
 			SafeDelete(this->_socketClient);
 			return false;

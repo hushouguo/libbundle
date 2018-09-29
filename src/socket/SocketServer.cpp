@@ -169,11 +169,8 @@ BEGIN_NAMESPACE_BUNDLE {
 				bundle::releaseMessage(msg);
 			}
 
-			// close listening port
-			if (this->_fd_listening != BUNDLE_INVALID_SOCKET) {
-				::close(this->_fd_listening);
-				this->_fd_listening = BUNDLE_INVALID_SOCKET;
-			}
+			// close socket
+			SafeClose(this->_fd_listening);
 		}
 	}
 

@@ -264,6 +264,7 @@ using bool		= 						int;
 
 #define SafeFree(P)						do { if(P) { ::free((void*)P); (P) = nullptr; } } while(0)
 #define SafeDelete(P)					do { if(P) { delete (P); (P) = nullptr; } } while(0)
+#define SafeClose(S)					do { if(S > 0) { ::close(S); S = -1; } } while(0)
 
 #define BEGIN_NAMESPACE_BUNDLE			namespace bundle
 BEGIN_NAMESPACE_BUNDLE {

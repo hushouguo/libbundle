@@ -425,7 +425,6 @@ BEGIN_NAMESPACE_BUNDLE {
 				//std::this_thread::sleep_for(std::chrono::milliseconds(1));
 				std::unique_lock<std::mutex> locker(this->_logMutex);
 				this->_logCondition.wait(locker);
-				fprintf(stderr, "logProcess condition wakeup\n");
 			}
 		}
 		fprintf(stderr, "Easylog exit, logQueue: %ld\n", this->_logQueue.size());

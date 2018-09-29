@@ -9,7 +9,7 @@ using namespace bundle;
 
 //Time t1, t2;
 struct timeval t1, t2;
-u32 N = 10;
+u32 n = 0, N = 3;
 
 SocketServer* ss = nullptr;
 SocketClient* cs = nullptr;
@@ -117,7 +117,7 @@ void test_net2() {
 	System << "test net OK";
 }
 
-void test_net() {
+void test_net3() {
 	ss = SocketServerCreator::create([=](const void* buffer, size_t len) -> int{
 			return len;
 			});
@@ -153,6 +153,75 @@ void test_net() {
 
 	runnable();
 
+	SafeDelete(ss);
+}
+
+void test_net() {
+	ss = SocketServerCreator::create([=](const void* buffer, size_t len) -> int{
+			return len;
+			});
+	assert(ss);
+	ss->setWorkerNumber(4);
+	bool rc = ss->start("0.0.0.0", 12306);
+	assert(rc);
+	
+	cs = SocketClientCreator::create([=](const void* buffer, size_t len) -> int{
+			return len;
+			});
+	assert(cs);
+	rc = cs->connect("127.0.0.1", 12306, 10);
+	assert(rc);
+
+	auto doServerMessage = []() {
+		SOCKET s = -1;
+		bool establish = false, close = false;
+		const Socketmessage* msg = ss->receiveMessage(s, establish, close);
+		if (msg) {
+			if (establish) {
+				//fprintf(stderr, "SocketServer: establish: %d\n", s);
+			}
+			else if (close) {
+				//fprintf(stderr, "SocketServer: lostConnection: %d\n", s);
+			}
+			else {
+				fprintf(stderr, "receive Socketmessage: %d, payload:%s, payload_len:%ld\n", 
+						n, (const char*)messagePayload(msg), messagePayloadLength(msg));
+				++n;
+			}
+			bundle::releaseMessage(msg);
+		}
+	};
+
+	auto doClientMessage = []() {
+		bool establish = false, close = false;
+		const Socketmessage* msg = cs->receiveMessage(establish, close);
+		if (msg) {
+			if (establish) {
+				fprintf(stderr, "SocketClient: establish\n");
+			}
+			else if (close) {
+				fprintf(stderr, "SocketClient: lostConnection\n");
+			}
+			else {
+			}
+			bundle::releaseMessage(msg);
+		}
+	};
+
+	while (!sConfig.halt) {
+		if (ss) {
+			doServerMessage();
+			if (n >= N) {
+				SafeDelete(ss);
+			}
+		}
+		if (cs) {
+			doClientMessage();
+		}
+		std::this_thread::sleep_for(std::chrono::milliseconds(1));	
+	}
+
+	SafeDelete(cs);
 	SafeDelete(ss);
 }
 

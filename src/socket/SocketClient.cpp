@@ -34,7 +34,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			WorkerProcess* _slotWorker = nullptr;
 			LockfreeQueue<Socketmessage*> _readQueue; 
 			
-			SOCKET _fd = BUNDLE_INVALID_SOCKET;
+			SOCKET _fd = -1;
 			bool _stop = true, _active = false;
 			
 			bool _connect_in_progress = false;
@@ -87,22 +87,18 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	bool SocketClientInternal::connectAsync() {
-		CHECK_RETURN(this->active() == false, true, "connectAsync already establish");
-		CHECK_RETURN(this->connect_in_progress() == false, false, "connectAsync in progress");
-		this->_connect_in_progress = true;
+		if (this->_retry_thread && this->_retry_thread->joinable()) {
+			this->_retry_thread->join();
+		}
 		SafeDelete(this->_retry_thread);
 		this->_retry_thread = new std::thread([this]() {
 			for (; !this->isstop() && !this->active(); ) {
-				if (this->_fd != BUNDLE_INVALID_SOCKET) {
-					::close(this->_fd);
-					this->_fd = BUNDLE_INVALID_SOCKET;
-				}
-				::sleep(CONNECT_INTERVAL);
+				SafeClose(this->_fd);
+				std::this_thread::sleep_for(std::chrono::seconds(CONNECT_INTERVAL));
 				if (this->connectServer(CONNECT_TIMEOUT)) {
 					this->_active = true;
 				}
 			}			
-			this->_connect_in_progress = false;
 			if (this->active()) {
 				this->_slotWorker->addSocket(this->fd(), false);
 			}
@@ -149,6 +145,14 @@ BEGIN_NAMESPACE_BUNDLE {
 	void SocketClientInternal::stop() {
 		if (!this->isstop()) {
 			this->_stop = true;
+
+			// release retry thread
+			if (this->_retry_thread && this->_retry_thread->joinable()) {
+				this->_retry_thread->join();
+			}
+			SafeDelete(this->_retry_thread);
+
+			// release WorkerProcess
 			SafeDelete(this->_slotWorker);
 
 			// release readQueue messages
@@ -158,14 +162,8 @@ BEGIN_NAMESPACE_BUNDLE {
 				bundle::releaseMessage(msg);
 			}
 
-			// close connected port
-			if (this->_fd != BUNDLE_INVALID_SOCKET) {
-				::close(this->_fd);
-				this->_fd = BUNDLE_INVALID_SOCKET;
-			}
-
-			// release retry thread
-			SafeDelete(this->_retry_thread);
+			// close socket
+			SafeClose(this->_fd);
 		}
 	}
 
