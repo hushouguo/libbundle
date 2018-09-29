@@ -22,18 +22,16 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 #endif
 
+	//
+	// get the number of cpu
 	int cpus() {
 #if __cplusplus > 199711L	
 		return std::thread::hardware_concurrency();
 #else		
 		return __sys_cpus;
-#endif		
+#endif
 	}
 
-	//
-	// strerror
-	//
-	
 	
 #define SYS_ERRNO	128
 	
@@ -48,25 +46,35 @@ BEGIN_NAMESPACE_BUNDLE {
 			__errlist[err] = strdup(::strerror(err));
 		}
 	}
+
+	__attribute__((destructor)) static void __strerror_destroy() {
+		if (__errlist) {
+			for (int err = 0; err < SYS_ERRNO; ++err) {
+				SafeFree(__errlist[err]);
+			}
+			SafeFree(__errlist);
+		}
+	}
 #endif
 	
+	//
+	// like ::strerror
 	const char* strerror(int err) {
 #ifdef PLATFORM_WINDOWS
 		if (!__errlist) { __strerror_init(); }
 #endif
-		return err >= 0 && err < SYS_ERRNO ? __errlist[err] : "Unknown error";
+		return err >= 0 && err < SYS_ERRNO ? __errlist[err] : ::strerror(err);
 	}
 
 
 	//
-	// time & timestamp
-	//
-
-	u64 timeSecond() {
-		// cost of executing 1 million times is: 4 ms
-		return std::time(nullptr);
+	// get current time seconds	
+	u64 timeSecond() {		
+		return std::time(nullptr); // cost of executing 1 million times is: 4 ms
 	}
-	
+
+	//
+	// get current time milliseconds	
 	u64 timeMillisecond() {
 		// cost of executing 1 million times is:
 		// 		c++ 11 waste: 38 ms
@@ -84,7 +92,10 @@ BEGIN_NAMESPACE_BUNDLE {
 	//		c++ 11 waste: 1721 ms
 	//		gettimeofday waste: 138 ms
 #if true
-	const char* timestamp(char* buf, size_t len, u64 seconds, const char* time_format) {
+	//
+	// get current timestamp
+	//	if time_format is nullptr, default value is "%y/%02m/%02d %02H:%02M:%02S", like: 18/06/29 15:04:18
+	const char* timestamp(char* buffer, size_t len, u64 seconds, const char* time_format) {
 		struct timeval tv = { tv_sec: (time_t) seconds, tv_usec: 0 };
 		if (tv.tv_sec == 0) {
 			gettimeofday(&tv, nullptr);
@@ -102,9 +113,9 @@ BEGIN_NAMESPACE_BUNDLE {
 		struct tm result;
 		gmtime_r(&tv.tv_sec, &result);
 		
-		std::strftime(buf, len, time_format, &result);
+		std::strftime(buffer, len, time_format, &result);
 
-		return (const char *) buf;
+		return (const char *) buffer;
 	}
 #else	
 	const char* timestamp(char* buf, size_t len, u64 milliseconds, const char* time_format, bool with_milliseconds) {
@@ -139,14 +150,12 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 #endif
 
+
 	//
-	// string utilities
-	//
-	
+	// hash string
 	u32 hashString(const char* s) {
 		return hashString(s, strlen(s));
-	}
-		
+	}		
 	u32 hashString(const char* s, size_t len) {
 #ifdef USE_CPP_HASH
 		return std::hash<std::string>{}(s);
@@ -162,31 +171,55 @@ BEGIN_NAMESPACE_BUNDLE {
 		}
 		return h;
 #endif
-	}
-		
+	}		
 	u32 hashString(const std::string& s) {
 		return hashString(s.data(), s.length());
 	}
+
 		
-	bool splitString(const char* str, char cr, std::vector<int>& v) {
-		char *newstr = strdup(str);
+	//
+	// extrace string to int, long, long long or string by specifying seperate character
+	bool splitString(const char* cstr, char sc, std::vector<int>& v) {
+		char* newstr = strdup(cstr);
+		int value = 0;
 		char *s = newstr, *p = newstr;
-		while ((p = strchr(p, cr)) != nullptr) {
+		while ((p = strchr(p, sc)) != nullptr) {
 			*p++ = '\0';
-			int value = strtol(s, (char**)NULL, 10);
+#if true
+			std::string ss = s;
+			try {
+				value = std::stoi(ss);
+			} catch(...) {
+				SafeFree(newstr);
+				return false;
+			}
+#else
+			value = strtol(s, (char**)NULL, 10);
 			if (errno == EINVAL || errno == ERANGE) {
 				SafeFree(newstr); 
 				return false;
 			}
+#endif			
 			v.push_back(value);
 			s = p;
 		}
+		
 		if (*s != '\0') {
-			int value = strtol(s, (char**) nullptr, 10);
+#if true		
+			std::string ss = s;
+			try {
+				value = std::stoi(ss);
+			} catch(...) {
+				SafeFree(newstr);
+				return false;
+			}
+#else
+			value = strtol(s, (char**) nullptr, 10);
 			if (errno == EINVAL || errno == ERANGE) {
 				SafeFree(newstr); 
 				return false;
 			}
+#endif
 			v.push_back(value);
 		}
 		else {
@@ -195,11 +228,112 @@ BEGIN_NAMESPACE_BUNDLE {
 		SafeFree(newstr);
 		return true;
 	}
+
+			bool splitString(const char* cstr, char sc, std::vector<long>& v) {
+				char* newstr = strdup(cstr);
+				int value = 0;
+				char *s = newstr, *p = newstr;
+				while ((p = strchr(p, sc)) != nullptr) {
+					*p++ = '\0';
+#if true
+					std::string ss = s;
+					try {
+						value = std::stol(ss);
+					} catch(...) {
+						SafeFree(newstr);
+						return false;
+					}
+#else
+					value = strtol(s, (char**)NULL, 10);
+					if (errno == EINVAL || errno == ERANGE) {
+						SafeFree(newstr); 
+						return false;
+					}
+#endif			
+					v.push_back(value);
+					s = p;
+				}
+				
+				if (*s != '\0') {
+#if true		
+					std::string ss = s;
+					try {
+						value = std::stol(ss);
+					} catch(...) {
+						SafeFree(newstr);
+						return false;
+					}
+#else
+					value = strtol(s, (char**) nullptr, 10);
+					if (errno == EINVAL || errno == ERANGE) {
+						SafeFree(newstr); 
+						return false;
+					}
+#endif
+					v.push_back(value);
+				}
+				else {
+					// Note: add default value ??
+				}
+				SafeFree(newstr);
+				return true;
+			}
+	
+		bool splitString(const char* cstr, char sc, std::vector<long long>& v) {
+			char* newstr = strdup(cstr);
+			int value = 0;
+			char *s = newstr, *p = newstr;
+			while ((p = strchr(p, sc)) != nullptr) {
+				*p++ = '\0';
+#if true
+				std::string ss = s;
+				try {
+					value = std::stoll(ss);
+				} catch(...) {
+					SafeFree(newstr);
+					return false;
+				}
+#else
+				value = strtoll(s, (char**)NULL, 10);
+				if (errno == EINVAL || errno == ERANGE) {
+					SafeFree(newstr); 
+					return false;
+				}
+#endif			
+				v.push_back(value);
+				s = p;
+			}
+			
+			if (*s != '\0') {
+#if true		
+				std::string ss = s;
+				try {
+					value = std::stoll(ss);
+				} catch(...) {
+					SafeFree(newstr);
+					return false;
+				}
+#else
+				value = strtoll(s, (char**) nullptr, 10);
+				if (errno == EINVAL || errno == ERANGE) {
+					SafeFree(newstr); 
+					return false;
+				}
+#endif
+				v.push_back(value);
+			}
+			else {
+				// Note: add default value ??
+			}
+			SafeFree(newstr);
+			return true;
+		}
+	
 		
-	bool splitString(const char* str, char cr, std::vector<std::string>& v) {
-		char *newstr = strdup(str);
+	bool splitString(const char* cstr, char sc, std::vector<std::string>& v) {
+		char *newstr = strdup(cstr);
 		char *s = newstr, *p = newstr;
-		while ((p = strchr(p, cr)) != nullptr) {
+		while ((p = strchr(p, sc)) != nullptr) {
 			*p++ = '\0';
 			v.push_back(s);
 			s = p;
@@ -213,56 +347,53 @@ BEGIN_NAMESPACE_BUNDLE {
 		SafeFree(newstr);
 		return true;
 	}
+
+	//
+	// string and wstring convert each other
 	
 #if __GNUC__ >= 5
-	std::wstring s2ws(const std::string& str)
+	std::wstring string2wstring(const std::string& s)
 	{
 		using convert_typeX = std::codecvt_utf8<wchar_t>;
 		std::wstring_convert<convert_typeX, wchar_t> converterX;
-		return converterX.from_bytes(str);
+		return converterX.from_bytes(s);
 	}
 	
-	std::string ws2s(const std::wstring& wstr)
+	std::string wstring2string(const std::wstring& ws)
 	{
 		using convert_typeX = std::codecvt_utf8<wchar_t>;
 		std::wstring_convert<convert_typeX, wchar_t> converterX;
-		return converterX.to_bytes(wstr);
+		return converterX.to_bytes(ws);
 	}
 #else
-	std::wstring s2ws(const std::string& str) 
+	std::wstring string2wstring(const std::string& s) 
 	{
-		if (str.empty()) {
+		if (s.empty()) {
 			return L"";
 		}
-		unsigned len = str.size() + 1;
+		unsigned len = s.size() + 1;
 		setlocale(LC_CTYPE, "en_US.UTF-8");
 		std::unique_ptr<wchar_t[]> p(new wchar_t[len]);
-		mbstowcs(p.get(), str.c_str(), len);
-		std::wstring w_str(p.get());
-		return w_str;
+		mbstowcs(p.get(), s.c_str(), len);
+		std::wstring ws(p.get());
+		return ws;
 	}
-	std::string ws2s(const std::wstring& w_str) 
+	std::string wstring2string(const std::wstring& ws) 
 	{
-		if (w_str.empty()) {
+		if (ws.empty()) {
 			return "";
 		}
-		unsigned len = w_str.size() * 4 + 1;
+		unsigned len = ws.size() * 4 + 1;
 		setlocale(LC_CTYPE, "en_US.UTF-8");
 		std::unique_ptr<char[]> p(new char[len]);
-		wcstombs(p.get(), w_str.c_str(), len);
-		std::string str(p.get());
-		return str;
+		wcstombs(p.get(), ws.c_str(), len);
+		std::string s(p.get());
+		return s;
 	}	
 #endif
 	
-	
-
-	//
-	// network address & port compose
-	//
-
 #pragma pack(1)
-	union AddressUnion {
+	union NetworkEndpoint {
 		struct {
 			u32 address;
 			u32 port;
@@ -271,63 +402,141 @@ BEGIN_NAMESPACE_BUNDLE {
 	};
 #pragma pack()
 
-	u64 hashAddress(const char* address, int port) {
+	//
+	// network address and u64 convert each other
+	u64 combineNetworkEndpoint(const char* address, int port) {
 		struct in_addr inp;
-		if (inet_aton(address, &inp) == 0) {
-			Error.cout("Bad network address: %s", address);
-			return 0;
-		}
-		
-		AddressUnion u;
+		CHECK_RETURN(inet_aton(address, &inp), 0, "Bad network address: %s", address);
+		NetworkEndpoint u;
 		u.address = inp.s_addr;
-		u.port = htons(port);
-		
+		u.port = htons(port);		
 		return u.value;
 	}
 	
-	void splitAddress(u64 value, std::string& address, int& port) {
-		AddressUnion u;
-		u.value = value;
-		
+	std::tuple<std::string, int> splitNetworkEndpoint(u64 value) {
+		NetworkEndpoint u;
+		u.value = value;		
 		struct in_addr inp;
-		inp.s_addr = u.address;		
-		address = inet_ntoa(inp);
-
-		port = ntohs(u.port);
+		inp.s_addr = u.address;
+		return std::make_tuple(inet_ntoa(inp), ntohs(u.port));
 	}
 
+	//
+	// gethostname c function simple wrapping
 	const char* gethostname() {
 		static char __hostname[64];
 		::gethostname(__hostname, sizeof(__hostname));
 		return __hostname;
 	}
 	
-	//
-	// file & directory i/o
-	//
+		const char* getCurrentDirectory() {
+			static char __dir_buffer[PATH_MAX];
+	//#if defined(_GNU_SOURCE)
+#if false
+			// absolute path name, like: /home/hushouguo/libbundle/tests 
+			const char* s = get_current_dir_name(); 		
+			strncpy(__dir_buffer, s, sizeof(__dir_buffer));
+			SafeFree(s);
+			return __dir_buffer;
+#else
+			// absolute path name, like: /home/hushouguo/libbundle/tests
+			return ::getcwd(__dir_buffer, sizeof(__dir_buffer));
+#endif
+		}
 	
+		const char* getDirectoryName(const char* fullname) {
+			static char __dir_buffer[PATH_MAX];
+			strncpy(__dir_buffer, fullname, sizeof(__dir_buffer));
+			return dirname(__dir_buffer);
+		}
+	
+		const char* getFilename(const char* fullname) {
+			static char __filename_buffer[PATH_MAX];
+			strncpy(__filename_buffer, fullname, sizeof(__filename_buffer));
+			return basename(__filename_buffer);
+		}
+	
+		const char* absoluteDirectory(const char* fullname) {
+			static char __dir_buffer[PATH_MAX]; 	
+			char* realdir = realpath(getDirectoryName(fullname), nullptr);
+			snprintf(__dir_buffer, sizeof(__dir_buffer), "%s/%s", realdir, getFilename(fullname));
+			SafeFree(realdir);
+			return __dir_buffer;
+		}
+		
+	
+	//
+	// test for the file is a directory
 	bool isDir(const char* file) {
 		struct stat buf;
 		if (stat(file, &buf) != 0) { return false; }
 		return S_ISDIR(buf.st_mode);
 	}
 
+	//
+	// existDir: 
+	//	test for the existence of the file
+	// accessableDir, readableDir, writableDir:
+	// 	test whether the file exists and grants read, write, and execute permissions, respectively.
 	bool existDir(const char* file) {
 		return access(file, F_OK) == 0;
 	}
-
 	bool readableDir(const char* file) {
 		return access(file, R_OK) == 0;
 	}
-	
 	bool writableDir(const char* file) {
 		return access(file, W_OK) == 0;
 	}
-	
 	bool accessableDir(const char* file) {
 		return access(file, X_OK) == 0;
 	}
 
+		//
+		// create inexistence folder
+		bool createDirectory(const char* path) {
+			// store current workspace
+			const char* current_folder = getCurrentDirectory(); 	
+			char name[PATH_MAX], *dir = name;
+			strncpy(name, path, sizeof(name));
+			while (dir != nullptr) {
+				char* tailer = strchr(dir, '/');
+				if (tailer) {
+					*tailer++ = '\0';
+				}
+	
+				if (strlen(dir) == 0) {
+					goto dont_need_mkdir;
+				}
+	
+				if (access(dir, F_OK)) {
+					umask(0);
+					if (mkdir(dir, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) == -1) { 
+						Error.cout("mkdir directory:%s error: %d, %s", dir, errno, strerror(errno));
+						return false;
+					}
+				}
+	
+				if (access(dir, X_OK)) {
+					Error.cout("access directory:%s error: %d, %s", dir, errno, strerror(errno));
+					return false;
+				}
+	
+				if (chdir(dir)) {
+					Error.cout("chdir directory:%s error: %d, %s", dir, errno, strerror(errno));
+					return false;
+				}
+	
+	dont_need_mkdir:			
+				dir = tailer;
+			}
+	
+			// restore workspace
+			return chdir(current_folder) == 0;
+		}
+
+		
+		//
+		// iterate specifying folder
 	bool traverseDirectory(const char* folder, const char* filter_suffix, std::function<bool(const char*)>& callback) {
 		if (!isDir(folder)) {
 			return callback(folder);
@@ -359,52 +568,17 @@ BEGIN_NAMESPACE_BUNDLE {
 		return true;
 	}
 
-	bool createDirectory(const char* path) {
-		char name[PATH_MAX], *dir = name;
-		strncpy(name, path, sizeof(name));
-		while (dir != nullptr) {
-			char* tailer = strchr(dir, '/');
-			if (tailer) {
-				*tailer++ = '\0';
-			}
-
-			if (strlen(dir) == 0) {
-				goto dont_need_mkdir;
-			}
-
-		 	if (access(dir, F_OK)) {
-				umask(0);
-				if (mkdir(dir, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) == -1) { 
-					Error.cout("mkdir directory:%s error: %d, %s", dir, errno, strerror(errno));
-					return false;
-				}
-			}
-
-			if (access(dir, X_OK)) {
-				Error.cout("access directory:%s error: %d, %s", dir, errno, strerror(errno));
-				return false;
-			}
-
-			if (chdir(dir)) {
-				Error.cout("chdir directory:%s error: %d, %s", dir, errno, strerror(errno));
-				return false;
-			}
-
-dont_need_mkdir:			
-			dir = tailer;
-		}
-
-		chdir(getCurrentDirectory());
-
-		return true;
-	}
 	
+	//
+	// get existence file size
 	u64 getFileSize(const char* filename) {
 		struct stat buf;
 		if (stat(filename, &buf) != 0) { return 0; }
 		return buf.st_size;
 	}
 
+	//
+	// load file content into string
 	bool loadfile(const char* filename, std::string& s) {
 		try {
 #if false
@@ -420,19 +594,16 @@ dont_need_mkdir:
 #endif
 		}
 		catch(std::exception& e) {
-			Error.cout("loadfile exception:%s", e.what());
-			return false;
-		}
-		
+			CHECK_RETURN(false, false, "loadfile exception:%s", e.what());
+		}		
 		return true;
 	}
 	
 
 
 	//
-	// limits
-	//
-
+	// limits: stack_size, max_files
+	
 	// limits, linux default stack size: 8M (soft), 4G (hard)
 	bool setStackSizeLimit(u32 value) {
 		struct rlimit limit;
@@ -474,6 +645,8 @@ dont_need_mkdir:
 	// random & random_between
 	//
 
+	//
+	// get a random value
 	int randomValue() {
 		std::random_device rd;
 		return rd();
@@ -482,16 +655,20 @@ dont_need_mkdir:
 	thread_local int _randomSeed = std::time(nullptr) + ::getpid();
 	thread_local std::default_random_engine _randomEngine(_randomSeed);
 
+	//
+	// set/get random seed
 	int getRandomSeed() {
 		return _randomSeed;
 	}
-
 	int setRandomSeed(int seed) {
 		_randomSeed = seed;
 		_randomEngine.seed(_randomSeed);
 		return _randomSeed;
 	}
 
+
+	//
+	// random between int, long, long long, float or double, [min, max]
 	int randomBetween(int min, int max) {
 		//std::default_random_engine randomEngine(_randomSeed);
 		std::uniform_int_distribution<int> dist(min, max);//[min, max]
@@ -514,20 +691,25 @@ dont_need_mkdir:
 		'a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z',
 		'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'
 	};
-	void randomString(std::string& result, size_t len, bool enable_digital, bool enable_lower, bool enable_upper) {
-		while (len > 0 && (enable_digital || enable_lower || enable_upper)) {
+	
+	//
+	// random a string
+	void randomString(std::string& result, size_t len, bool has_digit, bool has_lowercase, bool has_uppercase) {
+		while (len > 0 && (has_digit || has_lowercase || has_uppercase)) {
 			int i = randomBetween(0, sizeof(_alphabet) - 1);
 			assert(i >= 0 && i < (int)sizeof(_alphabet));
 			char c = _alphabet[i];
-			if ((enable_digital && std::isdigit(c)) 
-					|| (enable_lower && std::islower(c))
-					|| (enable_upper && std::isupper(c))) {
+			if ((has_digit && std::isdigit(c)) 
+					|| (has_lowercase && std::islower(c))
+					|| (has_uppercase && std::isupper(c))) {
 				--len;
 				result.push_back(c);
 			}
 		}
 	}
 
+	//
+	// signal value to string
 	const char* signalString(int sig)
 	{
 		static const char* __sig_string[] = {
@@ -576,24 +758,28 @@ dont_need_mkdir:
 
 
 	//
-	// misc
-	//
-
-	bool isdigit(const std::string& s) {
+	// check a string is all numeric
+	bool isDigit(const std::string& s) {
 		return !s.empty() && std::find_if(s.begin(), 
 			s.end(), [](char c) { return !std::isdigit(c); }) == s.end();
 	}
 
+	//
+	// get current thread id
 	s64 threadid() {
 		std::stringstream ss;
 		ss << std::this_thread::get_id();
 		return std::stol(ss.str().c_str());
 	}
 
+	//
+	// check that a floating point number is integer
 	bool isInteger(double value) {
 		return value == (int64_t)value;
 	}
 
+	//
+	// check that a string is utf8 encoding
 	bool isUTF8String(const std::string& string) {
 	    int c,i,ix,n,j;
 	    for (i = 0, ix = string.length(); i < ix; i++) {
@@ -618,6 +804,8 @@ dont_need_mkdir:
 	    return true;
 	}
 
+	//
+	// get the execution of the program, like: foo
 	const char* getProgramName() {
 #if defined(__APPLE__) || defined(__FreeBSD__)
 		return getprogname();	// need libbsd
@@ -631,6 +819,8 @@ dont_need_mkdir:
 #endif
 	}
 	
+	//
+	// get the complete execution of the program, like: ./bin/foo
 	const char* getProgramFullName() {
 #if defined(_GNU_SOURCE)
 		//extern char* program_invocation_name; 		// like: ./bin/routine
@@ -641,6 +831,7 @@ dont_need_mkdir:
 #endif
 	}
 
+<<<<<<< HEAD
 	const char* getCurrentDirectory() {
 		static char __dir_buffer[PATH_MAX];
 //#if defined(_GNU_SOURCE)
@@ -676,6 +867,10 @@ dont_need_mkdir:
 		return __dir_buffer;
 	}
 	
+=======
+	//
+	// bundle library init routine
+>>>>>>> 9faf125dcd3593d7166812861cd86bacb4a5b3f9
 	bool init_runtime_environment(int argc, char* argv[]) {
 		// Verify that the version of the library that we linked against is
 		// compatible with the version of the headers we compiled against.
@@ -842,6 +1037,8 @@ dont_need_mkdir:
 		return true;
 	}
 
+	//
+	// bundle library shutdown routine
 	void shutdown_bundle_library() {
 		//NOTE: cleanup internal resource
 		Trace.cout("shutdown bundle library with terminate reason: %d", sConfig.terminate_reason);
@@ -850,6 +1047,8 @@ dont_need_mkdir:
 		google::protobuf::ShutdownProtobufLibrary();
 	}
 
+	//
+	// allocate new buffer and copy buffer to new buffer, like: strdup
 	void* memdup(void* buffer, size_t size) {
 		void* newbuffer = ::malloc(size);
 		memcpy(newbuffer, buffer, size);
@@ -857,6 +1056,10 @@ dont_need_mkdir:
 	}
 
 	static std::vector<std::string> __argv;
+
+	
+	//
+	// setup/reset process title
 	void setProcesstitle(int argc, char* argv[], const char* title) {
 		if (__argv.empty()) {
 			for (int i = 0; i < argc; ++i) {

@@ -34,7 +34,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			bool getsockopt(int opt, void* optval, size_t optlen) override;
 
 		private:
-			u32 _workerNumber = std::thread::hardware_concurrency();
+			u32 _workerNumber = cpus();
 			LockfreeQueue<Socketmessage*> _readQueue;
 			std::vector<WorkerProcess*> _processes;
 			WorkerProcess* getWorkerProcess(SOCKET);
@@ -48,8 +48,8 @@ BEGIN_NAMESPACE_BUNDLE {
 
 	bool SocketServerInternal::setWorkerNumber(u32 worker_number) {
 		CHECK_RETURN(this->_stop, false, "SockerServer is running, stop it at first!");
-		CHECK_RETURN(worker_number < std::thread::hardware_concurrency() * 8, false, 
-		"woker number: %d too large, hardware: %d, suggest: %d", worker_number, std::thread::hardware_concurrency(), std::thread::hardware_concurrency() * 2);
+		CHECK_RETURN(worker_number < cpus() * 8, false, 
+		"woker number: %d too large, hardware: %d, suggest: %d", worker_number, cpus(), cpus() * 2);
 		this->_workerNumber = worker_number;
 		return true;
 	}

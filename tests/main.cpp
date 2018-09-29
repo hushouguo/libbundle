@@ -17,31 +17,6 @@
 
 int main(int argc, char** argv) {	
 	if (!bundle::init_runtime_environment(argc, argv)) { return 1; }
-	bundle::Easylog::syslog()->set_tostdout(bundle::GLOBAL, true);
-
-	std::string s = "101";
-	try {
-		int value = std::stoi(s);
-		fprintf(stderr, "s:%s, value:%d\n", s.c_str(), value);
-	} catch(std::exception& e) {
-		fprintf(stderr, "s: %s, exception: %s\n", s.c_str(), e.what());
-	}
-	
-	s = "10111aas2";
-	try {
-		int value = std::stoi(s);
-		fprintf(stderr, "s:%s, value:%d\n", s.c_str(), value);
-	} catch(...) {
-		fprintf(stderr, "s:%s, exception\n", s.c_str());
-	}
-
-	int value = strtol(s.c_str(), (char**)NULL, 10);
-	if (errno == EINVAL || errno == ERANGE) {
-		fprintf(stderr, "invalid s:%s\n", s.c_str());
-	}	
-	else {
-		fprintf(stderr, "s:%s, value:%d\n", s.c_str(), value);
-	}
 
 	//test_tools();
 	test_net();
