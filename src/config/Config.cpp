@@ -62,7 +62,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 		if (!this->confile.empty()) {
 			this->confile = absoluteDirectory(this->confile.c_str());
-		}		
+		}
 		return this->confile.empty() ? true : this->loadconf(this->confile.c_str());
 	}
 	

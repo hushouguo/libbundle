@@ -459,44 +459,21 @@ BEGIN_NAMESPACE_BUNDLE {
 	//
 	// create inexistence folder
 	bool createDirectory(const char* path) {
-		// store current workspace
-		const char* current_folder = getCurrentDirectory(); 	
-		char name[PATH_MAX], *dir = name;
-		strncpy(name, path, sizeof(name));
-		while (dir != nullptr) {
-			char* tailer = strchr(dir, '/');
-			if (tailer) {
-				*tailer++ = '\0';
+		std::string fullPath = absoluteDirectory(path);
+		std::string::size_type i = 0;
+		umask(0);
+		while (i < fullPath.length()) {
+			std::string::size_type head = fullPath.find('/', i);
+			std::string dir;
+			dir.assign(fullPath, 0, head);			
+			int rc = mkdir(dir.c_str(), S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
+			CHECK_RETURN(rc == 0 || errno == EEXIST, false, "mkdir: %s error: %d, %s", dir.c_str(), errno, strerror(errno));			
+			if (head == std::string::npos) {
+				break;
 			}
-
-			if (strlen(dir) == 0) {
-				goto dont_need_mkdir;
-			}
-
-			if (access(dir, F_OK)) {
-				umask(0);
-				if (mkdir(dir, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) == -1) { 
-					Error.cout("mkdir directory:%s error: %d, %s", dir, errno, strerror(errno));
-					return false;
-				}
-			}
-
-			if (access(dir, X_OK)) {
-				Error.cout("access directory:%s error: %d, %s", dir, errno, strerror(errno));
-				return false;
-			}
-
-			if (chdir(dir)) {
-				Error.cout("chdir directory:%s error: %d, %s", dir, errno, strerror(errno));
-				return false;
-			}
-
-dont_need_mkdir:			
-			dir = tailer;
+			i = head + 1;
 		}
-
-		// restore workspace
-		return chdir(current_folder) == 0;
+		return true;
 	}
 
 
@@ -862,6 +839,13 @@ dont_need_mkdir:
 #endif
 
 		//
+		// Config information
+		//
+		Trace.cout("refer to config file: %s", sConfig.confile.empty() ? "not configure" : sConfig.confile.c_str());
+		sConfig.dump();
+
+
+		//
 		// Easylog configure information
 		//
 		extern const char* level_string(EasylogSeverityLevel);
@@ -871,13 +855,6 @@ dont_need_mkdir:
 				Easylog::syslog()->autosplit_day() ? "yes" : "no", 
 				Easylog::syslog()->autosplit_hour() ? "yes" : "no");
 		Trace.cout("    log.dir: %s", Easylog::syslog()->destination());
-
-
-		//
-		// Config information
-		//
-		Trace.cout("refer to config file: %s", sConfig.confile.empty() ? "not configure" : sConfig.confile.c_str());
-		sConfig.dump();
 
 
 		//
