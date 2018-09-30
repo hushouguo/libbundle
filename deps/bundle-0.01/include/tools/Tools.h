@@ -40,7 +40,6 @@ BEGIN_NAMESPACE_BUNDLE {
 	bool accessableDir(const char* file);
 	bool readableDir(const char* file);
 	bool writableDir(const char* file);
-	const char* getDirectory(char* buf, size_t bufsize, const char* filename);
 	bool traverseDirectory(const char* folder, const char* filter_suffix, std::function<bool(const char*)>& callback);
 	bool createDirectory(const char* path);
 	u64 getFileSize(const char* filename);
@@ -74,9 +73,40 @@ BEGIN_NAMESPACE_BUNDLE {
 	void* memdup(void* buffer, size_t size);
 	void setProcesstitle(int argc, char* argv[], const char* title);
 	void resetProcesstitle(int argc, char* argv[]);
+	//
+	// get the execution of the program, like: foo
+	//
 	const char* getProgramName();
+	//
+	// get the complete execution of the program, like: ./bin/foo
+	//
 	const char* getProgramFullName();
+	//
+	// get current worker absolute directory, like: /home/hushouguo/workspace
+	//
 	const char* getCurrentDirectory();
+	
+	//
+	// extract dir from a path
+	//	path: ./workspace/test.cpp
+	//	return: ./workspace
+	//
+	const char* getDirectoryName(const char* fullname);
+
+	//
+	// extract filename from a path
+	//	path: ./workspace/test.cpp
+	//	return: test.cpp
+	//
+	const char* getFilename(const char* fullname);
+	
+	//
+	// convert to absolute directory
+	// 	like: ./workspace 			=> /home/hushouguo/workspace
+	//	like: ./workspace/test.cpp 	=> /home/hushouguo/workspace/test.cpp
+	//
+	const char* absoluteDirectory(const char* fullname);
+	
 	template <typename HANDLER>
 	void setSignal(int sig, HANDLER handler) {
 		struct sigaction act;

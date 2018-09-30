@@ -22,14 +22,12 @@ BEGIN_NAMESPACE_BUNDLE {
 
 	bool Config::init(int argc, char* argv[]) {
 		int c;
-		bool guard = false;
-		std::string confile;		
 		/*--argc, argv++;*/
 		while ((c = getopt(argc, argv, "dDhHc:g")) != -1) {
 			switch (c) {
 				case 'd': case 'D': sConfig.runasdaemon = true; break;
-				case 'c': confile = optarg; break;
-				case 'g': guard = true; break;
+				case 'c': this->confile = optarg; break;
+				case 'g': this->guard = true; break;
 				case 'h': case 'H': default: 
 					fprintf(stderr, "Usage: executable [OPTIONS]\n");
 					fprintf(stderr, "    OPTIONS:\n");
@@ -42,10 +40,10 @@ BEGIN_NAMESPACE_BUNDLE {
 
 		setlocale(LC_ALL, "");// for chinese console output
 
-		if (runasdaemon) {
+		if (this->runasdaemon) {
 			daemon(1, 1); /* nochdir, noclose */
-			if (guard) {
-				while (!sConfig.halt) {
+			if (this->guard) {
+				while (!this->halt) {
 					int pid = fork();
 					if (pid) {
 						setProcesstitle(argc, argv, " guard");
@@ -62,7 +60,10 @@ BEGIN_NAMESPACE_BUNDLE {
 			}
 		}
 
-		return confile.empty() ? true : this->loadconf(confile.c_str());
+		if (!this->confile.empty()) {
+			this->confile = absoluteDirectory(this->confile.c_str());
+		}		
+		return this->confile.empty() ? true : this->loadconf(this->confile.c_str());
 	}
 	
 	INITIALIZE_INSTANCE(Config);

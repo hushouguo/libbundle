@@ -328,18 +328,6 @@ BEGIN_NAMESPACE_BUNDLE {
 		return access(file, X_OK) == 0;
 	}
 
-	const char* getDirectory(char* buf, size_t bufsize, const char* filename) {
-		strncpy(buf, filename, bufsize);
-		char *p = strrchr(buf, '/');
-		if (p) {
-			*p = '\0';
-		}
-		else {
-			buf[0] = '.', buf[1] = '\0';
-		}
-		return buf;
-	}
-
 	bool traverseDirectory(const char* folder, const char* filter_suffix, std::function<bool(const char*)>& callback) {
 		if (!isDir(folder)) {
 			return callback(folder);
@@ -669,6 +657,26 @@ dont_need_mkdir:
 		return ::getcwd(__dir_buffer, sizeof(__dir_buffer));
 #endif
 	}
+
+	const char* getDirectoryName(const char* fullname) {
+		static char __dir_buffer[PATH_MAX];
+		strncpy(__dir_buffer, fullname, sizeof(__dir_buffer));
+		return dirname(__dir_buffer);
+	}
+
+	const char* getFilename(const char* fullname) {
+		static char __filename_buffer[PATH_MAX];
+		strncpy(__filename_buffer, fullname, sizeof(__dir_buffer));
+		return basename(__filename_buffer);
+	}
+
+	const char* absoluteDirectory(const char* fullname) {
+		static char __dir_buffer[PATH_MAX];		
+		char* realdir = realpath(getDirectoryName(fullname), nullptr);
+		snprintf(__dir_buffer, sizeof(__dir_buffer), "%s/%s", realdir, getFilename(fullname));
+		SafeFree(realdir);
+		return __dir_buffer;
+	}
 	
 	bool init_runtime_environment(int argc, char* argv[]) {
 		// Verify that the version of the library that we linked against is
@@ -695,15 +703,15 @@ dont_need_mkdir:
 		// libbundle
 		//
 #ifdef DEBUG		
-		Trace.cout("libbundle: %d.%d.%d, run as %s, debug", BUNDLE_VERSION_MAJOR, BUNDLE_VERSION_MINOR, BUNDLE_VERSION_PATCH, sConfig.runasdaemon ? "daemon" : "console");
+		Trace.cout("libbundle: %d.%d.%d, run as %s, %s, debug", BUNDLE_VERSION_MAJOR, BUNDLE_VERSION_MINOR, BUNDLE_VERSION_PATCH, sConfig.runasdaemon ? "daemon" : "console", sConfig.guard ? "with guard" : "no guard");
 #else		
-		Trace.cout("libbundle: %d.%d.%d, run as %s, release", BUNDLE_VERSION_MAJOR, BUNDLE_VERSION_MINOR, BUNDLE_VERSION_PATCH, sConfig.runasdaemon ? "daemon" : "console");
+		Trace.cout("libbundle: %d.%d.%d, run as %s, %s, release", BUNDLE_VERSION_MAJOR, BUNDLE_VERSION_MINOR, BUNDLE_VERSION_PATCH, sConfig.runasdaemon ? "daemon" : "console", sConfig.guard ? "with guard" : "no guard");
 #endif
 		
 		//
 		// Easylog configure information
 		//
-		extern const char* level_string(EasylogSeverityLevel level);
+		extern const char* level_string(EasylogSeverityLevel);
 		Trace.cout("Easylog:");
 		Trace.cout("    log.level: %s", level_string(Easylog::syslog()->level()));
 		Trace.cout("    log.autosplit_day: %s, log.autosplit_hour: %s", 
@@ -715,6 +723,7 @@ dont_need_mkdir:
 		//
 		// Config information
 		//
+		Trace.cout("refer to config file: %s", sConfig.confile.empty() ? "not configure" : sConfig.confile.c_str());
 		sConfig.dump();
 
 		
@@ -794,7 +803,7 @@ dont_need_mkdir:
 			Trace << "shard: " << shard;
 		}
 		else {
-			Trace << "shard: not configured (shard.id)";
+			Trace << "shard: not configure (shard.id)";
 		}
 		
 		//

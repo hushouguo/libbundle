@@ -29,6 +29,16 @@ BEGIN_NAMESPACE_BUNDLE {
 			//	0: Normal exit, > 0: Signal terminated, < 0: Error code
 			//
 			int  terminate_reason = 0;
+
+			//
+			// Record configure filename
+			//
+			std::string confile;
+
+			//
+			// Has the marking the system enable guard process
+			//
+			bool guard = false;
 			
 			inline void syshalt(int reason = 0) {
 				if (!this->halt) {

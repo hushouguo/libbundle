@@ -523,14 +523,16 @@ BEGIN_NAMESPACE_BUNDLE {
 #endif
 
 	bool EasylogInternal::set_destination(std::string dir) {
-		if (!existDir(dir.c_str()) && !createDirectory(dir.c_str())) {
+		char* realdir = absoluteDirectory(dir.c_str());
+		CHECK_RETURN(realdir, false, "dir: `%s` is not valid directory", dir.c_str());
+		if (!existDir(realdir) && !createDirectory(realdir)) {
 			return false;
 		}
-		CHECK_RETURN(existDir(dir.c_str()), false, "dir: `%s` not existence", dir.c_str());
-		CHECK_RETURN(isDir(dir.c_str()), false, "`%s` not directory", dir.c_str());
-		CHECK_RETURN(accessableDir(dir.c_str()), false, "dir: `%s` not accessible", dir.c_str());
-		CHECK_RETURN(writableDir(dir.c_str()), false, "dir: `%s` not writable", dir.c_str());
-		this->_dest_dir = dir;
+		CHECK_RETURN(existDir(realdir), false, "dir: `%s` not existence", realdir);
+		CHECK_RETURN(isDir(realdir), false, "`%s` not directory", realdir);
+		CHECK_RETURN(accessableDir(realdir), false, "dir: `%s` not accessible", realdir);
+		CHECK_RETURN(writableDir(realdir), false, "dir: `%s` not writable", realdir);
+		this->_dest_dir = realdir;
 		return true;
 	}
 
