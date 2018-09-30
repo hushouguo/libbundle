@@ -75,6 +75,8 @@ BEGIN_NAMESPACE_BUNDLE {
 	void setProcesstitle(int argc, char* argv[], const char* title);
 	void resetProcesstitle(int argc, char* argv[]);
 	const char* getProgramName();
+	const char* getProgramFullName();
+	const char* getCurrentDirectory();
 	template <typename HANDLER>
 	void setSignal(int sig, HANDLER handler) {
 		struct sigaction act;

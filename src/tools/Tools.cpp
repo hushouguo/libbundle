@@ -372,7 +372,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	bool createDirectory(const char* path) {
-		char* current_dir = get_current_dir_name();
+		char* current_dir = getCurrentDirectory();
 		char name[PATH_MAX], *dir = name;
 		strncpy(name, path, sizeof(name));
 		while (dir != nullptr) {
@@ -645,6 +645,31 @@ dont_need_mkdir:
 #endif
 	}
 	
+	const char* getProgramFullName() {
+#if defined(_GNU_SOURCE)
+		//extern char* program_invocation_name; 		// like: ./bin/routine
+		//extern char* program_invocation_short_name;	// like: routine
+		return ::program_invocation_name;
+#else
+		return ::getenv("_");
+#endif
+	}
+
+	const char* getCurrentDirectory() {
+		static char __dir_buffer[PATH_MAX];
+//#if defined(_GNU_SOURCE)
+#if false
+		// absolute path name, like: /home/hushouguo/libbundle/tests 
+		const char* s = get_current_dir_name();			
+		strncpy(__dir_buffer, s, sizeof(__dir_buffer));
+		SafeFree(s);
+		return __dir_buffer;
+#else
+		// absolute path name, like: /home/hushouguo/libbundle/tests
+		return ::getcwd(__dir_buffer, sizeof(__dir_buffer));
+#endif
+	}
+	
 	bool init_runtime_environment(int argc, char* argv[]) {
 		// Verify that the version of the library that we linked against is
 		// compatible with the version of the headers we compiled against.
@@ -664,6 +689,34 @@ dont_need_mkdir:
 		Easylog::syslog()->set_destination(sConfig.get("log.dir", ".logs"));
 		Easylog::syslog()->set_tofile(GLOBAL, getProgramName());
 		Easylog::syslog()->set_tostdout(GLOBAL, sConfig.runasdaemon ? false : true);
+
+		
+		//
+		// libbundle
+		//
+#ifdef DEBUG		
+		Trace.cout("libbundle: %d.%d.%d, run as %s, debug", BUNDLE_VERSION_MAJOR, BUNDLE_VERSION_MINOR, BUNDLE_VERSION_PATCH, sConfig.runasdaemon ? "daemon" : "console");
+#else		
+		Trace.cout("libbundle: %d.%d.%d, run as %s, release", BUNDLE_VERSION_MAJOR, BUNDLE_VERSION_MINOR, BUNDLE_VERSION_PATCH, sConfig.runasdaemon ? "daemon" : "console");
+#endif
+		
+		//
+		// Easylog configure information
+		//
+		extern const char* level_string(EasylogSeverityLevel level);
+		Trace.cout("Easylog:");
+		Trace.cout("    log.level: %s", level_string(Easylog::syslog()->level()));
+		Trace.cout("    log.autosplit_day: %s, log.autosplit_hour: %s", 
+				Easylog::syslog()->autosplit_day() ? "yes" : "no", 
+				Easylog::syslog()->autosplit_hour() ? "yes" : "no");
+		Trace.cout("    log.dir: %s", Easylog::syslog()->destination());
+
+
+		//
+		// Config information
+		//
+		sConfig.dump();
+
 		
 		//
 		// limit
@@ -678,7 +731,7 @@ dont_need_mkdir:
 			setOpenFilesLimit(max_files);
 		}
 
-		Trace << "StackSize: " << getStackSizeLimit() << ", MaxOpenFiles: " << getOpenFilesLimit();		
+		Trace.cout("stack size: %u (limit.stack_size), max files: %u (limit.max_files)", getStackSizeLimit(), getOpenFilesLimit());
 		
 		//
 		// install signal handler
@@ -741,14 +794,13 @@ dont_need_mkdir:
 			Trace << "shard: " << shard;
 		}
 		else {
-			Trace << "shard: not configured";
+			Trace << "shard: not configured (shard.id)";
 		}
 		
 		//
 		// output 3rd libraries
 		//
 		Trace.cout("all 3rd libraries:");
-		Trace.cout("    libbundle: %d.%d.%d", BUNDLE_VERSION_MAJOR, BUNDLE_VERSION_MINOR, BUNDLE_VERSION_PATCH);
 		
 #ifdef TC_VERSION_MAJOR		
 		Trace.cout("    tcmalloc: %d.%d%s", TC_VERSION_MAJOR, TC_VERSION_MINOR, TC_VERSION_PATCH);
@@ -779,7 +831,7 @@ dont_need_mkdir:
 #endif
 		
 		Trace.cout("    gcc version: %d.%d.%d", __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__);
-
+		
 		return true;
 	}
 

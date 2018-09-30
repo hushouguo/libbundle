@@ -9,10 +9,27 @@
 BEGIN_NAMESPACE_BUNDLE {
 	class Config : public Registry {
 		public:
+			//
+			// Has the marking the system stopped 
+			//
 			bool halt = false;
+
+			//
+			// Has the marking the system run in the background
+			//
 			bool runasdaemon = false;
+
+			//
+			// Has the marking the system need to reload configure files or data files
+			//
 			bool reload = false;
+
+			//
+			// Record the system terminate reason
+			//	0: Normal exit, > 0: Signal terminated, < 0: Error code
+			//
 			int  terminate_reason = 0;
+			
 			inline void syshalt(int reason = 0) {
 				if (!this->halt) {
 					terminate_reason = reason;

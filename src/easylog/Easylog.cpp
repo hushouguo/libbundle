@@ -95,7 +95,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		EasylogSeverityLevel level;
 		EasylogColor color;
 		bool to_stdout;
-		std::string filename;
+		std::string filename, fullname;
 		std::ofstream* fs;
 		u64 fs_launchtime;
 #ifdef HAS_LOG_LAYOUT				
@@ -236,6 +236,9 @@ BEGIN_NAMESPACE_BUNDLE {
 			const std::list<EasylogLayoutNode*>& layout_prefix(EasylogSeverityLevel level) override { return this->_levels[level].layouts_prefix; }
 			const std::list<EasylogLayoutNode*>& layout_postfix(EasylogSeverityLevel level) override { return this->_levels[level].layouts_postfix; }
 #endif
+			const char* destination() override { return this->_dest_dir.c_str(); }
+			const char* current_log_filename(EasylogSeverityLevel level) override;
+
 			inline bool isstop() { return this->_stop; }
 			void stop() override;
 
@@ -249,7 +252,7 @@ BEGIN_NAMESPACE_BUNDLE {
 #else
 			EasylogSeverityLevel _level = LEVEL_TRACE;
 #endif
-			std::string _dest_dir = get_current_dir_name();
+			std::string _dest_dir = getCurrentDirectory();
 			bool _autosplit_day = true, _autosplit_hour = false;
 			void full_filename(const std::string& filename, std::string& fullname);
 
@@ -550,12 +553,11 @@ BEGIN_NAMESPACE_BUNDLE {
 			levelNode->fs->close();
 			SafeDelete(levelNode->fs);
 		}		
-		std::string fullname;
-		this->full_filename(levelNode->filename, fullname);
+		this->full_filename(levelNode->filename, levelNode->fullname);
 		try {
-			levelNode->fs = new std::ofstream(fullname, std::ios::app|std::ios::out);
+			levelNode->fs = new std::ofstream(levelNode->fullname, std::ios::app|std::ios::out);
 		} catch (std::exception& e) {
-			fprintf(stderr, "ofstream exception: %s, filename: %s\n", e.what(), fullname.c_str());
+			fprintf(stderr, "ofstream exception: %s, filename: %s\n", e.what(), levelNode->fullname.c_str());
 			SafeDelete(levelNode->fs);
 		}
 		levelNode->fs_launchtime = timeSecond();	
@@ -597,6 +599,11 @@ BEGIN_NAMESPACE_BUNDLE {
 				this->openfile(&levelNode);
 			}
 		}
+	}
+
+	const char* EasylogInternal::current_log_filename(EasylogSeverityLevel level) {
+		EasylogLevelNode* levelNode = &this->_levels[level];
+		return levelNode->fullname.c_str();
 	}
 
 	void EasylogInternal::set_toserver(EasylogSeverityLevel level, std::string address, int port) {

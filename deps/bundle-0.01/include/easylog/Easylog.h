@@ -154,10 +154,12 @@ BEGIN_NAMESPACE_BUNDLE {
 			virtual void set_level(EasylogSeverityLevel level) = 0;
 			virtual EasylogColor color(EasylogSeverityLevel level) = 0;
 			virtual void set_color(EasylogSeverityLevel level, EasylogColor color) = 0;
+			virtual const char* destination() = 0;
 			virtual bool set_destination(std::string dir) = 0;
 			virtual void set_tostdout(EasylogSeverityLevel level, bool enable) = 0;
 			virtual void set_toserver(EasylogSeverityLevel level, std::string address, int port) = 0;
 			virtual void set_tofile(EasylogSeverityLevel level, std::string filename) = 0;
+			virtual const char* current_log_filename(EasylogSeverityLevel level) = 0;
 			virtual bool autosplit_day() = 0;
 			virtual void set_autosplit_day(bool value) = 0;
 			virtual bool autosplit_hour() = 0;
