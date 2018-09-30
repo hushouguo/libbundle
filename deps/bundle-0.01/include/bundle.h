@@ -278,6 +278,7 @@ BEGIN_NAMESPACE_BUNDLE {
 #include "tools/Tools.h"
 #include "tools/Spinlocker.h"
 #include "tools/LockfreeQueue.h"
+#include "tools/HttpParser.h"
 #include "entry/Entry.h"
 #include "entry/Manager.h"
 #include "sha/sha1.h"

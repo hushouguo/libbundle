@@ -169,5 +169,18 @@ void test_tools() {
 	//TODO: ByteBuffer etc...
 	//
 
+	//wechat jscode
+	bundle::decode_jscode("wx4c05f6310ae5922d", "8e73b42717adb805086e7d76198e24be", "021K1vv72iOXpK0Tmrx723RLv72K1vvI", nullptr,
+			[](bool rc, std::string session_key, std::string openid, void* context) {
+				Trace << "rc: " << rc;
+				Trace << "session_key: " << session_key << ", openid: " << openid;
+				Trace << "context: " << context;
+				sConfig.syshalt();
+	});
+
+	while (!sConfig.halt) {
+		sleep(1);
+	}
+
 	System << "test tools OK";
 }

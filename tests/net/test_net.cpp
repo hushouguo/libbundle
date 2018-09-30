@@ -152,7 +152,7 @@ void test_net3() {
 	SafeDelete(ss);
 }
 
-void test_net() {
+void test_net4() {
 	ss = SocketServerCreator::create([=](const void* buffer, size_t len) -> int{
 			return len;
 			});
@@ -215,6 +215,74 @@ void test_net() {
 	}
 
 	SafeDelete(cs);
+	SafeDelete(ss);
+}
+
+void test_net() {
+	HttpParser parser;
+	ss = SocketServerCreator::create([&](const void* buffer, size_t len) -> int{
+			return parser.parse((const char*) buffer, len);
+			});
+	assert(ss);
+	ss->setWorkerNumber(4);
+	bool rc = ss->start("0.0.0.0", 12306);
+	assert(rc);
+	
+	auto doServerMessage = [&]() {
+		const Socketmessage* msg = ss->receiveMessage();
+		if (msg) {
+			if (IS_ESTABLISH_MESSAGE(msg)) {
+				//fprintf(stderr, "SocketServer: establish: %d\n", s);
+			}
+			else if (IS_CLOSE_MESSAGE(msg)) {
+				//fprintf(stderr, "SocketServer: lostConnection: %d\n", s);
+			}
+			else {
+				SOCKET s = GET_MESSAGE_SOCKET(msg);
+				std::string req = (const char*) GET_MESSAGE_PAYLOAD(msg);
+				size_t len = GET_MESSAGE_PAYLOAD_LENGTH(msg);
+				fprintf(stderr, "req.length: %ld, len: %ld\n", req.length(), len);
+
+				//fprintf(stderr, "receive Socketmessage: %d, payload:%s, payload_len:%ld\n", 
+				//		n, (const char*) GET_MESSAGE_PAYLOAD(msg), GET_MESSAGE_PAYLOAD_LENGTH(msg));
+
+				Trace << "request: " << req;
+
+				parser.clear();
+				size_t nread = parser.parse(req.c_str(), len);
+				if (nread > 0) {
+					parser.dump();
+
+					//
+					// send response
+					const char* response = 
+						"HTTP/1.1 200 OK\r\n"
+						"Content-Type: text/html; charset=UTF-8\r\n"
+						"Content-Length: 11\r\n"
+						"Connection: close\r\n"
+						"Date: Thu, 31 Dec 2009 20:55:48 +0000\r\n"
+						"\r\n"
+						"hello world";
+						
+					ss->sendMessage(s, response, strlen(response));
+				}
+
+				++n;
+			}
+			bundle::releaseMessage(msg);
+		}
+	};
+	
+	while (!sConfig.halt) {
+		if (ss) {
+			doServerMessage();
+			//if (n >= N) {
+			//	SafeDelete(ss);
+			//}
+		}
+		std::this_thread::sleep_for(std::chrono::milliseconds(1));	
+	}
+
 	SafeDelete(ss);
 }
 
