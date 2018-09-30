@@ -269,38 +269,38 @@ BEGIN_NAMESPACE_BUNDLE {
 			//std::unordered_map<EasylogSeverityLevel, EasylogLevelNode> _levels = {
 			std::map<EasylogSeverityLevel, EasylogLevelNode> _levels = {
 				{ LEVEL_DEBUG, 
-{ level:LEVEL_DEBUG, color:LBLUE, to_stdout:false, filename:"", fs:nullptr, fs_launchtime:0
+{ level:LEVEL_DEBUG, color:LBLUE, to_stdout:false, filename:"", fullname:"", fs:nullptr, fs_launchtime:0
 #ifdef HAS_LOG_LAYOUT
 , layouts_prefix:{}, layouts_postfix:{} 
 #endif
 }},
 
 				{ LEVEL_TRACE, 
-{ level:LEVEL_TRACE, color:GREY, to_stdout:false, filename:"", fs:nullptr, fs_launchtime:0
+{ level:LEVEL_TRACE, color:GREY, to_stdout:false, filename:"", fullname:"", fs:nullptr, fs_launchtime:0
 #ifdef HAS_LOG_LAYOUT
 , layouts_prefix:{}, layouts_postfix:{} 
 #endif
 }},
 				{ LEVEL_ALARM, 
-{ level:LEVEL_ALARM, color:YELLOW, to_stdout:true, filename:"", fs:nullptr, fs_launchtime:0
+{ level:LEVEL_ALARM, color:YELLOW, to_stdout:true, filename:"", fullname:"", fs:nullptr, fs_launchtime:0
 #ifdef HAS_LOG_LAYOUT
 , layouts_prefix:{}, layouts_postfix:{} 
 #endif
 }},
 				{ LEVEL_ERROR, 
-{ level:LEVEL_ERROR, color:LRED, to_stdout:true, filename:"", fs:nullptr, fs_launchtime:0
+{ level:LEVEL_ERROR, color:LRED, to_stdout:true, filename:"", fullname:"", fs:nullptr, fs_launchtime:0
 #ifdef HAS_LOG_LAYOUT
 , layouts_prefix:{}, layouts_postfix:{} 
 #endif
 }},
 				{ LEVEL_PANIC, 
-{ level:LEVEL_PANIC, color:LMAGENTA, to_stdout:true, filename:"", fs:nullptr, fs_launchtime:0
+{ level:LEVEL_PANIC, color:LMAGENTA, to_stdout:true, filename:"", fullname:"", fs:nullptr, fs_launchtime:0
 #ifdef HAS_LOG_LAYOUT
 , layouts_prefix:{}, layouts_postfix:{} 
 #endif
 }},
 				{ LEVEL_SYSTEM, 
-{ level:LEVEL_SYSTEM, color:LCYAN, to_stdout:true, filename:"", fs:nullptr, fs_launchtime:0
+{ level:LEVEL_SYSTEM, color:LCYAN, to_stdout:true, filename:"", fullname:"", fs:nullptr, fs_launchtime:0
 #ifdef HAS_LOG_LAYOUT
 , layouts_prefix:{}, layouts_postfix:{} 
 #endif

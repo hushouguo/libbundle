@@ -360,7 +360,6 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	bool createDirectory(const char* path) {
-		char* current_dir = getCurrentDirectory();
 		char name[PATH_MAX], *dir = name;
 		strncpy(name, path, sizeof(name));
 		while (dir != nullptr) {
@@ -395,8 +394,7 @@ dont_need_mkdir:
 			dir = tailer;
 		}
 
-		chdir(current_dir);
-		SafeFree(current_dir);
+		chdir(getCurrentDirectory());
 
 		return true;
 	}
