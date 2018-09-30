@@ -98,42 +98,45 @@ BEGIN_NAMESPACE_BUNDLE {
 		CHECK_RETURN(this->_socketServer, false, "please call `start` to init service");
 		while (!this->isstop()) {
 			const Socketmessage* msg = this->_socketServer->receiveMessage();
+			if (!msg) {
+				return true;
+			}
+
 			SOCKET s = GET_MESSAGE_SOCKET(msg);
-			if (msg) {
-				bool rc = true;
-				if (IS_ESTABLISH_MESSAGE(msg)) {
-					NetworkTask* task = this->spawnConnection(s);
-					if (this->_establishConnection) {
-						this->_establishConnection(this, task);
-					}
+			
+			bool rc = true;
+			if (IS_ESTABLISH_MESSAGE(msg)) {
+				NetworkTask* task = this->spawnConnection(s);
+				if (this->_establishConnection) {
+					this->_establishConnection(this, task);
 				}
-				else if (IS_CLOSE_MESSAGE(msg)) {
-					NetworkTask* task = FindOrNull(this->_tasks, s);
-					if (task) {
-						if (this->_lostConnection) {
-							this->_lostConnection(this, task);
-						}
-						this->closeConnection(s);
+			}
+			else if (IS_CLOSE_MESSAGE(msg)) {
+				NetworkTask* task = FindOrNull(this->_tasks, s);
+				if (task) {
+					if (this->_lostConnection) {
+						this->_lostConnection(this, task);
 					}
-					else {
-						Error << "not found NetworkTask: " << s;
-					}
+					this->closeConnection(s);
 				}
 				else {
-					NetworkTask* task = FindOrNull(this->_tasks, s);
-					if (task && this->_msgParser) {
-						const Netmessage* netmsg = (const Netmessage *) GET_MESSAGE_PAYLOAD(msg);
-						size_t payload_len = GET_MESSAGE_PAYLOAD_LENGTH(msg);
-						assert(payload_len == netmsg->len);
-						rc = this->_msgParser(this, task, netmsg);
-					}
-				}
-				if (rc) {
-					bundle::releaseMessage(msg);
+					Error << "not found NetworkTask: " << s;
 				}
 			}
 			else {
-				return true;
+				NetworkTask* task = FindOrNull(this->_tasks, s);
+				if (task && this->_msgParser) {
+					const Netmessage* netmsg = (const Netmessage *) GET_MESSAGE_PAYLOAD(msg);
+					size_t payload_len = GET_MESSAGE_PAYLOAD_LENGTH(msg);
+					assert(payload_len == netmsg->len);
+					rc = this->_msgParser(this, task, netmsg);
+				}
+			}
+			
+			//
+			// msgParser return true means this msg no longer used
+			if (rc) {
+				bundle::releaseMessage(msg);
 			}
 		}
 		return !this->isstop();

@@ -56,32 +56,34 @@ BEGIN_NAMESPACE_BUNDLE {
 		CHECK_RETURN(this->_socketClient, false, "please call `connect` to init client");
 		while (!this->isstop()) {
 			const Socketmessage* msg = this->_socketClient->receiveMessage();
-			if (msg) {
-				bool rc = true;
-				if (IS_ESTABLISH_MESSAGE(msg)) {
-					if (this->_establishConnection) {
-						this->_establishConnection(this);
-					}
+			if (!msg) {
+				return true;
+			}
+			
+			bool rc = true;
+			if (IS_ESTABLISH_MESSAGE(msg)) {
+				if (this->_establishConnection) {
+					this->_establishConnection(this);
 				}
-				else if (IS_CLOSE_MESSAGE(msg)) {
-					if (this->_lostConnection) {
-						this->_lostConnection(this);
-					}
-				}
-				else {
-					if (this->_msgParser) {
-						const Netmessage* netmsg = (const Netmessage *) GET_MESSAGE_PAYLOAD(msg);
-						size_t payload_len = GET_MESSAGE_PAYLOAD_LENGTH(msg);
-						assert(payload_len == netmsg->len);
-						rc = this->_msgParser(this, netmsg);
-					}
-				}
-				if (rc) {
-					bundle::releaseMessage(msg);
+			}
+			else if (IS_CLOSE_MESSAGE(msg)) {
+				if (this->_lostConnection) {
+					this->_lostConnection(this);
 				}
 			}
 			else {
-				return true;
+				if (this->_msgParser) {
+					const Netmessage* netmsg = (const Netmessage *) GET_MESSAGE_PAYLOAD(msg);
+					size_t payload_len = GET_MESSAGE_PAYLOAD_LENGTH(msg);
+					assert(payload_len == netmsg->len);
+					rc = this->_msgParser(this, netmsg);
+				}
+			}
+
+			//
+			// msgParser return true means this msg no longer used
+			if (rc) {
+				bundle::releaseMessage(msg);
 			}
 		}
 		return !this->isstop();

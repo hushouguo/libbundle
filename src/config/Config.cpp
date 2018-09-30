@@ -16,7 +16,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		this->clear();
 		xmlParser.makeRegistry(this);
 		xmlParser.final();
-		this->dump();
+		//this->dump();
 		return true;			
 	}
 
