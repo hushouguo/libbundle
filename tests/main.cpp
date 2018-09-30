@@ -17,7 +17,6 @@
 
 int main(int argc, char** argv) {	
 	if (!bundle::init_runtime_environment(argc, argv)) { return 1; }
-	bundle::Easylog::syslog()->set_tostdout(bundle::GLOBAL, true);
 
 	//test_tools();
 	test_net();
