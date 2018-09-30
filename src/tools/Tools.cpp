@@ -1039,15 +1039,13 @@ BEGIN_NAMESPACE_BUNDLE {
 	//
 	static size_t curlWriteCallback(const char* ptr, size_t size, size_t nmemb, CurlContext* context) {
 		void* userdata = context->userdata;
-		std::function<void(std::string, std::string, void*)> func = context->callback;
+		std::function<void(bool, std::string, std::string, void*)> func = context->callback;
 		SafeDelete(context);
 
 		Debug << "curlWriteCallback: " << ptr;
 	
 		rapidjson::Document document;  // Default template parameter uses UTF8 and MemoryPoolAllocator.
-		bool rc = document.Parse(ptr).HasParseError();
-		//CHECK_RETURN(rc == false, size * nmemb, "parse curlWriteCallback: %s error", ptr);
-		if (rc == false) {
+		if (document.Parse(ptr).HasParseError()) {
 			func(false, "ParseCallbackError", ptr, userdata);
 			return size * nmemb;
 		}
@@ -1061,22 +1059,22 @@ BEGIN_NAMESPACE_BUNDLE {
 			return size * nmemb;
 		}
 		
-		if (!document.HasMember("session_key") || document['session_key'].IsString()) {
+		if (!document.HasMember("session_key") || document["session_key"].IsString()) {
 			func(false, "not found `session_key`", errmsg, userdata);
 			return size * nmemb;
 		}
 		
-		if (!document.HasMember("openid") || !document['openid'].IsString()) {
+		if (!document.HasMember("openid") || !document["openid"].IsString()) {
 			func(false, "not found `openid`", errmsg, userdata);
 			return size * nmemb;
 		}
 
-		std::string session_key = document['session_key'].GetString();
-		std::string openid = document['openid'].GetString();
+		std::string session_key = document["session_key"].GetString();
+		std::string openid = document["openid"].GetString();
 
 		Debug << "session_key: " << session_key << ", openid: " << openid;
 
-		func(session_key, openid, userdata);
+		func(true, session_key, openid, userdata);
 		
 		return size * nmemb;  
 	}
