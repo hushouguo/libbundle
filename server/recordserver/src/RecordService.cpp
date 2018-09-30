@@ -25,10 +25,9 @@ RecordService::RecordService()
 }
 
 bool RecordService::init() {
-	return this->start(
-			sConfig.get("service.address", "0.0.0.0"), 
-			sConfig.get("service.port", 9990)
-			);
+	return this->setWorkerNumber(sConfig.get("service.worker", 0))
+			&&
+			this->start(sConfig.get("service.address", "0.0.0.0"), sConfig.get("service.port", 9990));
 }
 
 bool RecordService::msgParser(NetworkInterface* task, const Netmessage* netmsg) {

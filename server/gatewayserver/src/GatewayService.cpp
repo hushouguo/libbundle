@@ -26,10 +26,9 @@ GatewayService::GatewayService()
 }
 
 bool GatewayService::init() {
-	return this->start(
-			sConfig.get("service.address", "0.0.0.0"), 
-			sConfig.get("service.port", 9900)
-	);
+	return this->setWorkerNumber(sConfig.get("service.worker", cpus() * 2))
+			&&
+			this->start(sConfig.get("service.address", "0.0.0.0"), sConfig.get("service.port", 9900));
 }
 
 DECLARE_MESSAGE();

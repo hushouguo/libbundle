@@ -956,7 +956,7 @@ dont_need_mkdir:
 			Trace << "shard: " << shard;
 		}
 		else {
-			Trace << "shard: not configure (shard.id)";
+			Alarm << "shard: not configure (shard.id)";
 		}
 
 		//
