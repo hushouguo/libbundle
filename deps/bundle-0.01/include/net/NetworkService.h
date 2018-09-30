@@ -26,11 +26,11 @@ BEGIN_NAMESPACE_BUNDLE {
 			inline SocketServer* socketServer() { return this->_socketServer; }
 			NetworkInterface* getNetworkInterface(SOCKET s);
 			void releaseMessage(const Netmessage* netmsg);
-			bool setWorkerNumber(u32 value) { return this->_socketServer ? this->_socketServer->setWorkerNumber(value) : false; }
+			//bool setWorkerNumber(u32 value) { return this->_socketServer ? this->_socketServer->setWorkerNumber(value) : false; }
 
 		public:
 			bool update();
-			bool start(const char* address, int port);
+			bool start(const char* address, int port, u32 worker);
 			void stop();
 			void close(NetworkInterface*);
 

@@ -57,14 +57,15 @@ BEGIN_NAMESPACE_BUNDLE {
 		this->_tasks.erase(i);
 	}
 
-	bool NetworkService::start(const char* address, int port) {
+	bool NetworkService::start(const char* address, int port, u32 worker) {
 		SafeDelete(this->_socketServer);
 		this->_socketServer = SocketServerCreator::create([](const void* buffer, size_t len) -> int {
 				Netmessage* netmsg = (Netmessage*) buffer;
 				return len < sizeof(Netmessage) || len < netmsg->len ? 0 : netmsg->len;
 				});
 
-		bool rc = this->_socketServer->start(address, port);
+		bool rc = this->_socketServer->setWorkerNumber(worker) 
+					&& this->_socketServer->start(address, port);
 		if (!rc) {
 			SafeDelete(this->_socketServer);
 			return false;
