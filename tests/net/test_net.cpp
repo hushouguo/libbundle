@@ -286,7 +286,7 @@ void test_net5() {
 	SafeDelete(ss);
 }
 
-void test_net() {
+void test_net6() {
 	WebServer* ws = WebServerCreator::create();
 	assert(ws);
 	bool rc = ws->start("0.0.0.0", 12306);
@@ -319,3 +319,167 @@ void test_net() {
 	SafeDelete(ws);
 }
 
+#pragma pack(push, 1)
+struct fcgi_header {
+    unsigned char version;
+    unsigned char type;
+    unsigned char requestidB1;
+    unsigned char requestidB0;
+    unsigned char contentlengthB1;
+    unsigned char contentlengthB0;
+    unsigned char paddinglength;
+    unsigned char reserved;
+};
+
+enum fcgi_request_type {
+    FCGI_BEGIN_REQUEST      = 1,
+    FCGI_ABORT_REQUEST      = 2,
+    FCGI_END_REQUEST        = 3,
+    FCGI_PARAMS             = 4,
+    FCGI_STDIN              = 5,
+    FCGI_STDOUT             = 6,
+    FCGI_STDERR             = 7,
+    FCGI_DATA               = 8,
+    FCGI_GET_VALUES         = 9,
+    FCGI_GET_VALUES_RESULT  = 10,
+    FCGI_UNKOWN_TYPE        = 11
+};
+
+struct FCGI_BeginRequestBody {
+	unsigned char roleB1;
+	unsigned char roleB0;
+	unsigned char flags;
+	unsigned char reserved[5];
+};
+
+struct FCGI_EndRequestBody {
+    unsigned char appStatusB3;
+    unsigned char appStatusB2;
+    unsigned char appStatusB1;
+    unsigned char appStatusB0;
+    unsigned char protocolStatus;
+    unsigned char reserved[3];
+};
+
+enum fcgi_role {
+    FCGI_RESPONDER      = 1,
+    FCGI_AUTHORIZER     = 2,
+    FCGI_FILTER         = 3
+};
+
+enum protocolStatus {
+    FCGI_REQUEST_COMPLETE = 0,
+    FCGI_CANT_MPX_CONN = 1,
+    FCGI_OVERLOADED = 2,
+    FCGI_UNKNOWN_ROLE = 3
+};
+
+#pragma pack(pop)
+
+
+void test_net() {
+	HttpParser parser;
+	ss = SocketServerCreator::create([&](const void* buffer, size_t len) -> int{
+			//fprintf(stderr, "len:%ld, fcgi_header:%ld\n", len, sizeof(fcgi_header));
+			if (len < sizeof(fcgi_header)) {
+				return 0;
+			}
+			fcgi_header* header = (fcgi_header*) buffer;
+			u32 contentlength = (header->contentlengthB1 << 8) + header->contentlengthB0;
+			u32 package_len = sizeof(fcgi_header) + contentlength + header->paddinglength;
+			//fprintf(stderr, "contentlength:%d, B0:%d, B1:%d\n", contentlength, header->contentlengthB0, header->contentlengthB1);
+			return len >= package_len ? package_len : 0;
+			});
+	assert(ss);
+	ss->setWorkerNumber(4);
+	bool rc = ss->start("0.0.0.0", 9000);
+	assert(rc);
+	
+	auto doServerMessage = [&]() {
+		const Socketmessage* msg = ss->receiveMessage();
+		if (msg) {
+			SOCKET s = GET_MESSAGE_SOCKET(msg);
+			if (IS_ESTABLISH_MESSAGE(msg)) {
+				fprintf(stderr, "fastcgi: establish: %d\n", s);
+			}
+			else if (IS_CLOSE_MESSAGE(msg)) {
+				fprintf(stderr, "fastcgi: lostConnection: %d\n", s);
+			}
+			else {
+				size_t len = GET_MESSAGE_PAYLOAD_LENGTH(msg);
+				fprintf(stderr, "s:%d, payload len: %ld\n", s, len);
+				
+				const void* payload = GET_MESSAGE_PAYLOAD(msg);
+				assert(len >= sizeof(fcgi_header));
+				len -= sizeof(fcgi_header);
+
+				fcgi_header* header = (fcgi_header*) payload;
+				payload = (u8*) payload + sizeof(fcgi_header);
+				u32 requestid = (header->requestidB1 << 8) + header->requestidB0;
+				u32 contentlength = (header->contentlengthB1 << 8) + header->contentlengthB0;
+				Debug << "version:" << (u32) header->version;
+				Debug << "type:" << (u32) header->type;
+				Debug << "requestid:" << requestid;
+				Debug << "contentlength:" << contentlength;
+				Debug << "paddinglength:" << (u32) header->paddinglength;
+
+				switch (header->type) {
+					case FCGI_BEGIN_REQUEST:
+						if (true) {
+							Debug << "FCGI_BEGIN_REQUEST";
+							Debug << "leave len: " << len << ", FCGI_BeginRequestBody: " << sizeof(FCGI_BeginRequestBody);
+							assert(len >= sizeof(FCGI_BeginRequestBody));
+							len -= sizeof(FCGI_BeginRequestBody);
+							FCGI_BeginRequestBody* beginrequest = (FCGI_BeginRequestBody*) payload;
+							payload = (u8*) payload + sizeof(FCGI_BeginRequestBody);
+							u32 role = (beginrequest->roleB1 << 8) + beginrequest->roleB0;
+							Debug << "role: " << role;
+							Debug << "flags: " << (u32) beginrequest->flags;
+						} 
+						break;
+
+					case FCGI_PARAMS:
+						if (true) {
+							Debug << "FCGI_PARAMS";
+							Debug << "leave len: " << len;
+							//Debug << "read params: " << (const char*) payload;
+						}
+						break;
+
+					case FCGI_STDIN:
+						if (true) {
+							Debug << "FCGI_STDIN";
+							Debug << "leave len: " << len;
+							//Debug << "stdin: " << (const char*) payload;
+						}
+						break;
+
+					case FCGI_DATA:
+						if (true) {
+							Debug << "FCGI_DATA";
+							Debug << "leave len: " << len;
+						}
+
+					default: Error << "unhandled type: " << header->type; break; 
+				}
+
+				//ss->sendMessage(s, response, strlen(response));
+
+				++n;
+			}
+			bundle::releaseMessage(msg);
+		}
+	};
+	
+	while (!sConfig.halt) {
+		if (ss) {
+			doServerMessage();
+			//if (n >= N) {
+			//	SafeDelete(ss);
+			//}
+		}
+		std::this_thread::sleep_for(std::chrono::milliseconds(1));	
+	}
+
+	SafeDelete(ss);
+}
