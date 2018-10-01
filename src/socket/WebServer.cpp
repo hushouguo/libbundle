@@ -75,6 +75,37 @@ BEGIN_NAMESPACE_BUNDLE {
 		this->_evbuffer = evbuffer_new();
 		this->_evrequest = evrequest;
 		this->_decode_uri = decode_uri;
+		struct evhttp_uri* evuri = evhttp_uri_parse(decode_uri);
+		Debug << "scheme: " << evhttp_uri_get_scheme(evuri);
+		Debug << "userinfo: " << evhttp_uri_get_userinfo(evuri);
+		Debug << "host: " << evhttp_uri_get_host(evuri);
+		Debug << "port: " << evhttp_uri_get_port(evuri);
+		Debug << "path: " << evhttp_uri_get_path(evuri);
+		Debug << "query: " << evhttp_uri_get_query(evuri);
+		Debug << "fragment: " << evhttp_uri_get_fragment(evuri);
+
+		struct evkeyvalq headers;
+		int rc = evhttp_parse_query_str(evhttp_uri_get_query(evuri), &headers);
+		Debug << "rc: " << rc;
+		if (rc == 0) {
+			struct evkeyval* header = headers.tqh_first;
+			Debug << "first: " << (header ? "exist" : "nullptr");
+			while (header) {
+				Debug << "Name:" << header->key << ", Value:" << header->value;
+				header = header->next.tqe_next;
+			}
+		}
+
+		if (false) {
+			Debug << "input header:";
+			struct evkeyvalq* headers = evhttp_request_get_input_headers(evrequest);
+			for (struct evkeyval* header = headers->tqh_first; header;
+					header = header->next.tqe_next) {
+				Debug << header->key << ", " << header->value;
+			}		
+		}
+		
+		evhttp_uri_free(evuri);
 	}
 
 	WebRequest::~WebRequest() {}
@@ -121,6 +152,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 			
 	void WebServerInternal::releaseRequest(WebRequest* request) {
+		Debug << "release request: " << request->id();
 		SafeDelete(request);
 	}
 
@@ -131,6 +163,43 @@ BEGIN_NAMESPACE_BUNDLE {
 		return decode_uri;
 	}
 
+	//
+	// form-data: 
+	//  POST /do.php HTTP/1.1
+	//  Host: 192.168.1.188:12306
+	//  User-Agent: PostmanRuntime/7.1.5
+	//  Content-Length: 268
+	//  Accept: */*
+	//  Accept-Encoding: gzip, deflate
+	//  Cache-Control: no-cache
+	//  Content-Type: multipart/form-data; boundary=--------------------------292034440064387749135212
+	//  Postman-Token: 35f9b8bd-36e2-4e2c-837c-7825c781da1c
+	//  X-Lantern-Version: 4.8.2
+	//
+	//  ----------------------------292034440064387749135212
+	//  Content-Disposition: form-data; name="body1"
+	//
+	//  2
+	//  ----------------------------292034440064387749135212
+	//  Content-Disposition: form-data; name="body2"
+	//
+	//  amy
+	//  ----------------------------292034440064387749135212--
+	//
+	// x-www-form-urlencoded:
+	//	POST /do.php HTTP/1.1
+	//	Host: 192.168.1.188:12306
+	//	User-Agent: PostmanRuntime/7.1.5
+	//	Content-Length: 24
+	//	Accept: */*
+	//	Accept-Encoding: gzip, deflate
+	//	Cache-Control: no-cache
+	//	Content-Type: application/x-www-form-urlencoded
+	//	Postman-Token: c2a86fe6-d2ed-4971-bb22-8c2f0ec9d129
+	//	X-Lantern-Version: 4.8.2
+	//
+	//	var1=1&var2=husosdgfsdfg
+	//
 	const char* WebServerInternal::requestPost(struct evhttp_request* evrequest) {
 		std::ostringstream o;
 		o << evhttp_request_get_uri(evrequest) << "?";

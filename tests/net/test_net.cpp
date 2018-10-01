@@ -218,7 +218,7 @@ void test_net4() {
 	SafeDelete(ss);
 }
 
-void test_net5() {
+void test_net() {
 	HttpParser parser;
 	ss = SocketServerCreator::create([&](const void* buffer, size_t len) -> int{
 			return parser.parse((const char*) buffer, len);
@@ -286,7 +286,7 @@ void test_net5() {
 	SafeDelete(ss);
 }
 
-void test_net() {
+void test_net5() {
 	WebServer* ws = WebServerCreator::create();
 	assert(ws);
 	bool rc = ws->start("0.0.0.0", 12306);
@@ -295,6 +295,14 @@ void test_net() {
 		ws->run();
 		WebRequest* request = ws->getRequest();
 		if (request) {
+			if (request->header("Head1")) {
+				Debug << "Head1:" << request->header("Head1");
+			}
+			else {
+				Debug << "Head1:";
+			}
+			Debug << "Host:" << request->header("Host");
+			Debug << "url: " << request->url();
 			char time_buffer[64];
 			timestamp(time_buffer, sizeof(time_buffer));
 			request->pushString(time_buffer);
