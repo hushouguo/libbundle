@@ -31,7 +31,14 @@ BEGIN_NAMESPACE_BUNDLE {
 				return this->_evrequest->remote_port;
 			}
 			const char* variable(const char* name) override {
-				return nullptr;	//TODO:
+				auto i = this->_variables.find(name);
+				return i != this->_variables.end() ? i->second.c_str() : nullptr;
+			}
+			const std::unordered_map<std::string, std::string>& headers() override {
+				return this->_headers;
+			}
+			const std::unordered_map<std::string, std::string>& variables() override {
+				return this->_variables;
 			}
 
 			void addHeader(const char* name, const char* value) override {
@@ -59,14 +66,12 @@ BEGIN_NAMESPACE_BUNDLE {
 				this->_evrequest = nullptr; 
 			}
 
-			// general response
-			//
-
 		private:
 			u32 _id = 0;
-			const char* _decode_uri = nullptr;
 			struct evbuffer* _evbuffer = nullptr;
 			struct evhttp_request* _evrequest = nullptr;
+			std::unordered_map<std::string, std::string> _headers;
+			std::unordered_map<std::string, std::string> _variables;
 	};
 
 
@@ -74,44 +79,41 @@ BEGIN_NAMESPACE_BUNDLE {
 		this->_id = id;
 		this->_evbuffer = evbuffer_new();
 		this->_evrequest = evrequest;
-		this->_decode_uri = decode_uri;
+		assert(decode_uri);
+		Debug << "decode uri: " << decode_uri;
 		struct evhttp_uri* evuri = evhttp_uri_parse(decode_uri);
-		Debug << "scheme: " << evhttp_uri_get_scheme(evuri);
-		Debug << "userinfo: " << evhttp_uri_get_userinfo(evuri);
-		Debug << "host: " << evhttp_uri_get_host(evuri);
-		Debug << "port: " << evhttp_uri_get_port(evuri);
-		Debug << "path: " << evhttp_uri_get_path(evuri);
-		Debug << "query: " << evhttp_uri_get_query(evuri);
-		Debug << "fragment: " << evhttp_uri_get_fragment(evuri);
-
-		struct evkeyvalq headers;
-		int rc = evhttp_parse_query_str(evhttp_uri_get_query(evuri), &headers);
-		Debug << "rc: " << rc;
-		if (rc == 0) {
-			struct evkeyval* header = headers.tqh_first;
-			Debug << "first: " << (header ? "exist" : "nullptr");
-			while (header) {
-				Debug << "Name:" << header->key << ", Value:" << header->value;
-				header = header->next.tqe_next;
+		if (evuri) {
+			//Debug << "scheme: " << evhttp_uri_get_scheme(evuri);
+			//Debug << "userinfo: " << evhttp_uri_get_userinfo(evuri);
+			//Debug << "host: " << evhttp_uri_get_host(evuri);
+			//Debug << "port: " << evhttp_uri_get_port(evuri);
+			//Debug << "path: " << evhttp_uri_get_path(evuri);
+			//Debug << "query: " << evhttp_uri_get_query(evuri);
+			//Debug << "fragment: " << evhttp_uri_get_fragment(evuri);
+			struct evkeyvalq headers;
+			int rc = evhttp_parse_query_str(evhttp_uri_get_query(evuri), &headers);
+			if (rc == 0) {
+				for (struct evkeyval* header = headers.tqh_first; header; header = header->next.tqe_next) {
+					this->_variables.insert(std::make_pair(header->key, header->value));
+				}
 			}
+			if (true) {
+				struct evkeyvalq* headers = evhttp_request_get_input_headers(evrequest);
+				for (struct evkeyval* header = headers->tqh_first; header; header = header->next.tqe_next) {
+					this->_headers.insert(std::make_pair(header->key, header->value));
+				}		
+			}
+			evhttp_uri_free(evuri);
 		}
-
-		if (false) {
-			Debug << "input header:";
-			struct evkeyvalq* headers = evhttp_request_get_input_headers(evrequest);
-			for (struct evkeyval* header = headers->tqh_first; header;
-					header = header->next.tqe_next) {
-				Debug << header->key << ", " << header->value;
-			}		
+		else {
+			Error << "fail to parse decode uri:" << decode_uri;
 		}
-		
-		evhttp_uri_free(evuri);
+		SafeFree(decode_uri);
 	}
 
 	WebRequest::~WebRequest() {}
 	WebRequestInternal::~WebRequestInternal() {
 		evbuffer_free(this->_evbuffer);
-		SafeFree(this->_decode_uri);
 		//evhttp_request_free(this->_evrequest);
 	}
 
@@ -152,14 +154,14 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 			
 	void WebServerInternal::releaseRequest(WebRequest* request) {
-		Debug << "release request: " << request->id();
+		//Debug << "release request: " << request->id();
 		SafeDelete(request);
 	}
 
 	const char* WebServerInternal::requestGet(struct evhttp_request* evrequest) {
 		const char* uri = evhttp_request_get_uri(evrequest);
 		char* decode_uri = evhttp_decode_uri(uri);
-		Debug << "HTTP GET, URI: " << decode_uri;
+		//Debug << "HTTP GET, URI: " << decode_uri;
 		return decode_uri;
 	}
 
@@ -212,9 +214,9 @@ BEGIN_NAMESPACE_BUNDLE {
 				o << data;
 			}
 		}
-		Debug << "HTTP POST, buffer: " << o.str();
+		//Debug << "HTTP POST, buffer: " << o.str();
 		char* decode_uri = evhttp_decode_uri(o.str().c_str());
-		Debug << "HTTP POST, URI: " << decode_uri;
+		//Debug << "HTTP POST, URI: " << decode_uri;
 		return decode_uri;
 	}
 
@@ -235,7 +237,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		WebRequestInternal* request = new WebRequestInternal(this->_baseid++, evrequest, decode_uri);
 		this->_requests.push_back(request);
 
-		Debug << "HTTP: new request: " << request->id();
+		//Debug << "HTTP: new request: " << request->id();
 	}
 
 	static void RequestCallback(struct evhttp_request* evrequest, void* p) {

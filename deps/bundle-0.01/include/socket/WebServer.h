@@ -17,9 +17,11 @@ BEGIN_NAMESPACE_BUNDLE {
 			virtual evhttp_cmd_type cmd() = 0;
 			virtual const char* url() = 0;
 			virtual const char* header(const char* name) = 0;
+			virtual const char* variable(const char* name) = 0;
 			virtual const char* remote_host() = 0;
 			virtual int remote_port() = 0;
-			virtual const char* variable(const char* name) = 0;
+			virtual const std::unordered_map<std::string, std::string>& headers() = 0;
+			virtual const std::unordered_map<std::string, std::string>& variables() = 0;
 			// response routine
 			virtual void addHeader(const char* name, const char* value) = 0;
 			virtual void removeHeader(const char* name) = 0;
@@ -28,8 +30,6 @@ BEGIN_NAMESPACE_BUNDLE {
 			virtual void pushString(const std::string& content) = 0;
 			virtual void pushBinary(const void* data, size_t len) = 0;
 			virtual void send() = 0;
-			// general response
-			// like: 100 OK, 505 etc..
 	};
 
 	class WebServer {
