@@ -34,5 +34,6 @@ add_executable(${target} ${src} main.cpp)
 target_link_libraries(${target} rt dl curl unwind pthread)
 target_link_libraries(${target} ${BUNDLE_DIR}/lib/libbundle.a)
 target_link_libraries(${target} ${PROTOBUF_DIR}/lib/libprotobuf.a)
+target_link_libraries(${target} ${LIBEVENT_DIR}/lib/libevent.a)
 target_link_libraries(${target} ${TCMALLOC_DIR}/lib/libtcmalloc_minimal.a)
 

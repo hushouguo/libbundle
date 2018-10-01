@@ -295,6 +295,7 @@ BEGIN_NAMESPACE_BUNDLE {
 #include "socket/SocketServer.h"
 #include "socket/SocketClient.h"
 #include "socket/WebSocketServer.h"
+#include "socket/WebServer.h"
 #include "net/Netmessage.h"
 #include "net/NetworkInterface.h"
 #include "net/NetworkService.h"

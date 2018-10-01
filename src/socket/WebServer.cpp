@@ -3,56 +3,212 @@
  * \brief: Created by hushouguo at 13:41:25 Sep 30 2018
  */
 
-#if 0
 #include "bundle.h"
 #include "Helper.h"
 #include "Socket.h"
 
-#define SP		' '		// 32
-#define LF		'\n'	// 10
-#define CR		'\r'	// 13
-
 BEGIN_NAMESPACE_BUNDLE {
+	class WebRequestInternal : public WebRequest {
+		public:
+			WebRequestInternal(u32 id, struct evhttp_request* evrequest, const char* decode_uri);
+			~WebRequestInternal();
 
+		public:
+			u32 id() override { return this->_id; }
+			evhttp_cmd_type cmd() override {
+				return evhttp_request_get_command(this->_evrequest);
+			}
+			const char* url() override {
+				return evhttp_request_get_uri(this->_evrequest);
+			}
+			const char* header(const char* name) override {
+				return evhttp_find_header(this->_evrequest->input_headers, name);
+			}
+			const char* remote_host() override {
+				return this->_evrequest->remote_host ? this->_evrequest->remote_host : "UNDEFINED";
+			}
+			int remote_port() override {
+				return this->_evrequest->remote_port;
+			}
+			const char* variable(const char* name) override {
+				return nullptr;	//TODO:
+			}
+
+			void addHeader(const char* name, const char* value) override {
+				evhttp_add_header(this->_evrequest->output_headers, name, value);
+			}
+			void removeHeader(const char* name) override {
+				evhttp_remove_header(this->_evrequest->output_headers, name);
+			}
+			void clearHeader() override {
+				evhttp_clear_headers(this->_evrequest->output_headers);
+			}
+			void pushString(const char* content) override {
+				evbuffer_add(this->_evbuffer, content, strlen(content));
+			}
+			void pushString(const std::string& content) override {
+				evbuffer_add(this->_evbuffer, content.c_str(), content.length());
+			}
+			void pushBinary(const void* data, size_t len) override {
+				evbuffer_add(this->_evbuffer, data, len);
+			}
+			void send() override {
+				evhttp_send_reply(this->_evrequest, HTTP_OK, "OK", this->_evbuffer);
+				//the _evrequest will be freed in the callback function evhttp_send_reply or evhttp_send_done  
+				//when server finishes writing.
+				this->_evrequest = nullptr; 
+			}
+
+			// general response
+			//
+
+		private:
+			u32 _id = 0;
+			const char* _decode_uri = nullptr;
+			struct evbuffer* _evbuffer = nullptr;
+			struct evhttp_request* _evrequest = nullptr;
+	};
+
+
+	WebRequestInternal::WebRequestInternal(u32 id, struct evhttp_request* evrequest, const char* decode_uri) {
+		this->_id = id;
+		this->_evbuffer = evbuffer_new();
+		this->_evrequest = evrequest;
+		this->_decode_uri = decode_uri;
+	}
+
+	WebRequest::~WebRequest() {}
+	WebRequestInternal::~WebRequestInternal() {
+		evbuffer_free(this->_evbuffer);
+		SafeFree(this->_decode_uri);
+		//evhttp_request_free(this->_evrequest);
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////////////////////////////
+	//
+	
 	class WebServerInternal : public WebServer {
 		public:
 			WebServerInternal();
 			~WebServerInternal();
 			
 		public:
-			SOCKET fd() override {	return this->_socketServer->fd(); }
-			bool start(const char* address, int port) override { return this->_socketServer->start(address, port); }
-			void stop() override { this->_socketServer->stop(); }
-			const Socketmessage* receiveMessage() override;
-			void sendMessage(SOCKET s, const void*, size_t) override;
-			void close(SOCKET s) override { this->_socketServer->close(s); }
-			size_t size() override { return this->_socketServer->size(); }
-			bool setsockopt(int opt, const void* optval, size_t optlen) override { 
-				return this->_socketServer->setsockopt(opt, optval, optlen); 
-			}
-			bool getsockopt(int opt, void* optval, size_t optlen) override { 
-				return this->_socketServer->getsockopt(opt, optval, optlen); 
-			}
+			bool start(const char* address, int port) override;
+			void stop() override;
+			inline bool isstop() { return this->_stop; }
+			void run() override;
+			WebRequest* getRequest() override;
+			void releaseRequest(WebRequest*) override;
+			void createRequest(struct evhttp_request* evrequest);
 		
 		private:
-			SocketServer* _socketServer = nullptr;
-			std::set<std::string> _validMethods = { "GET", "POST" };
-			std::set<std::string> _validVersions = { "HTTP/1.0", "HTTP/1.1", "HTTP/2" }; // UNUSED HTTP/0.9
-			int parse_http_request(const char* buffer, size_t len);
+			u32 _baseid = 0;
+			bool _stop = false;
+			struct evhttp* _evhttp = nullptr;
+			struct event_base* _evbase = nullptr;
+			std::list<WebRequestInternal*> _requests;
+			const char* requestGet(struct evhttp_request* evrequest);
+			const char* requestPost(struct evhttp_request* evrequest);
 	};
 
-	WebServerInternal::WebServerInternal() {
-		this->_socketServer = SocketServerCreator::create([this](const void* data, size_t len) -> int {
-			const char* buffer = (const char*) data;
+	WebRequest* WebServerInternal::getRequest() {
+		WebRequest* request = nullptr;
+		if (!this->_requests.empty()) {
+			request = this->_requests.front();
+			this->_requests.pop_front();
+		}
+		return request;
+	}
+			
+	void WebServerInternal::releaseRequest(WebRequest* request) {
+		SafeDelete(request);
+	}
 
-			if (len >= 3 && buffer[0] == 'G' && buffer[1] == 'E' && buffer[2] == 'T') {	// GET
-				std::string Sec_WebSocket_Key;
-				return this->parse_handshake_request(buffer, len, Sec_WebSocket_Key);
+	const char* WebServerInternal::requestGet(struct evhttp_request* evrequest) {
+		const char* uri = evhttp_request_get_uri(evrequest);
+		char* decode_uri = evhttp_decode_uri(uri);
+		Debug << "HTTP GET, URI: " << decode_uri;
+		return decode_uri;
+	}
+
+	const char* WebServerInternal::requestPost(struct evhttp_request* evrequest) {
+		std::ostringstream o;
+		o << evhttp_request_get_uri(evrequest) << "?";
+		struct evbuffer* buffer = evhttp_request_get_input_buffer(evrequest);
+		while (evbuffer_get_length(buffer)) {
+			char data[1024];
+			int n = evbuffer_remove(buffer, data, sizeof(data) - 1);
+			if (n > 0) {
+				data[n] = '\0';
+				o << data;
 			}
-			else {
-				return this->parsePackage(buffer, len);
+		}
+		Debug << "HTTP POST, buffer: " << o.str();
+		char* decode_uri = evhttp_decode_uri(o.str().c_str());
+		Debug << "HTTP POST, URI: " << decode_uri;
+		return decode_uri;
+	}
+
+	void WebServerInternal::createRequest(struct evhttp_request* evrequest) {
+		const char* decode_uri = nullptr;
+		enum evhttp_cmd_type cmd = evhttp_request_get_command(evrequest);
+		switch (cmd) {
+			case EVHTTP_REQ_GET: decode_uri = this->requestGet(evrequest); break;
+			case EVHTTP_REQ_POST: decode_uri = this->requestPost(evrequest); break;
+			default: CHECK_RETURN(false, void(0), "unhandled http request cmd: %d\n", cmd);
+		}
+
+		if (!decode_uri) {
+			evhttp_request_free(evrequest);
+			return;
+		}
+
+		WebRequestInternal* request = new WebRequestInternal(this->_baseid++, evrequest, decode_uri);
+		this->_requests.push_back(request);
+
+		Debug << "HTTP: new request: " << request->id();
+	}
+
+	static void RequestCallback(struct evhttp_request* evrequest, void* p) {
+		WebServerInternal* thisServer = static_cast<WebServerInternal*>(p);
+		thisServer->createRequest(evrequest);
+	}
+	
+	bool WebServerInternal::start(const char* address, int port) {
+		int rc = evhttp_bind_socket(this->_evhttp, address, port);
+		CHECK_RETURN(rc == 0, false, "evhttp_bind_socket failure: %s,%d\n", address, port);
+		evhttp_set_gencb(this->_evhttp, RequestCallback, this);
+		Debug << "HTTP listening on: " << address << ", " << port;
+		return true;
+	}
+
+	void WebServerInternal::run() {
+		if (!this->isstop()) {
+			//int retval = event_base_loopexit(this->_evbase, &tv); //Memory Leak !!!
+			int retval = event_base_loop(this->_evbase, EVLOOP_ONCE | EVLOOP_NONBLOCK);
+			if (retval != 0) {
+				Error << "event_base_loop error: " << retval;
 			}
-		});
+		}
+	}
+
+	WebServerInternal::WebServerInternal() {
+		this->_evbase = event_base_new();
+		this->_evhttp = evhttp_new(this->_evbase);
+	}
+
+	void WebServerInternal::stop() {
+		if (!this->isstop()) {
+			this->_stop = true;
+			if (this->_evhttp) {
+				evhttp_free(this->_evhttp);
+				this->_evhttp = nullptr;
+			}
+			if (this->_evbase) {
+				event_base_free(this->_evbase);
+				this->_evbase = nullptr;
+			}
+		}
 	}
 
 	WebServer::~WebServer() {}
@@ -62,70 +218,6 @@ BEGIN_NAMESPACE_BUNDLE {
 
 	WebServer* WebServerCreator::create() {
 		return new WebServerInternal();
-	}
-			
-	int WebServerInternal::parse_http_request(const char* buffer, size_t len) {
-		std::istringstream is((const char*) buffer);
-
-		// request line
-		std::string request_line;
-		try {
-			// std::getline already filter '\n'
-			std::getline(is, request_line);// METHOD[SP]URL[SP]HTTP/1.1[CRLF]
-		} 
-		catch(std::exception& e) {
-			CHECK_RETURN(false, -1, "get request line exception: %s", e.what());
-		}
-
-		CHECK_RETURN(!request_line.empty(), -1, "request line is empty: %s", buffer);
-		CHECK_RETURN(request_line[request_line.size()-1] == CR, -1, "lack CR: %s", buffer);
-		request_line.erase(request_line.end() - 1);  // remove last char: CR
-
-		// METHOD
-		std::string::size_type i = request_line.find(":", 0);
-		CHECK_RETURN(i != std::string::npos, -1, "lack METHOD: %s", request_line.c_str());
-		std::string METHOD = request_line.substr(0, i); ++i;
-
-		// URL
-		std::string::size_type ii = request_line.find(":", i);
-		CHECK_RETURN(ii != std::string::npos, -1, "lack URL: %s", request_line.c_str());
-		std::string URL = request_line.substr(i, ii - i); ++ii;
-
-		// VERSION
-		CHECK_RETURN(ii != std::string::npos, -1, "lack VERSION: %s", request_line.c_str());
-		std::string VERSION = request_line.substr(ii);
-		
-		// header
-		std::string header;
-		while (true) {
-			try {
-				// std::getline already filter '\n'
-				std::getline(is, header);// header:[LWS]*data[CRLF]
-			} 
-			catch(std::exception& e) {
-				CHECK_RETURN(false, -1, "get header exception: %s", e.what());
-			}
-
-			CHECK_RETURN(!header.empty(), 0, "incomplete HTTP request");
-			CHECK_CONTINUE(header[header.size()-1] == CR, "there is a LF in the middle of header");
-
-			header.erase(header.end() - 1);   // remove last char: CR
-			if (header.empty()) {
-				break; // end of headers, CRLF
-			}
-
-			std::string::size_type i = header.find(":", 0);
-			CHECK_RETURN(i != std::string::npos, -1, "illegal HEADER: %s", header.c_str());
-			std::string name = header.substr(0, i); ++i;
-			std::string value = header.substr(i);
-			if (!value.empty()) {
-				value.erase(0, value.find_first_not_of(" "));	// ltrim
-				value.erase(value.find_last_not_of(" ") + 1);	// rtrim
-			}
-		}
-	
-		// body	
-
 	}
 }
 
@@ -211,5 +303,3 @@ BEGIN_NAMESPACE_BUNDLE {
 //
 // List of HTTP reponse header fields:
 //
-
-#endif

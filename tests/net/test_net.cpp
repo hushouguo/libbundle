@@ -218,7 +218,7 @@ void test_net4() {
 	SafeDelete(ss);
 }
 
-void test_net() {
+void test_net5() {
 	HttpParser parser;
 	ss = SocketServerCreator::create([&](const void* buffer, size_t len) -> int{
 			return parser.parse((const char*) buffer, len);
@@ -284,5 +284,27 @@ void test_net() {
 	}
 
 	SafeDelete(ss);
+}
+
+void test_net() {
+	WebServer* ws = WebServerCreator::create();
+	assert(ws);
+	bool rc = ws->start("0.0.0.0", 12306);
+	assert(rc);
+	while (!sConfig.halt) {
+		ws->run();
+		WebRequest* request = ws->getRequest();
+		if (request) {
+			char time_buffer[64];
+			timestamp(time_buffer, sizeof(time_buffer));
+			request->pushString(time_buffer);
+			request->send();
+			ws->releaseRequest(request);
+		}
+		else {
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));	
+		}
+	}
+	SafeDelete(ws);
 }
 
