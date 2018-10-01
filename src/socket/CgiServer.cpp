@@ -236,6 +236,23 @@ BEGIN_NAMESPACE_BUNDLE {
 			bool readParams(CgiRequestInternal*, const void* buffer, size_t len);
 			bool readStdin(CgiRequestInternal*, const void* buffer, size_t len);
 			bool readData(CgiRequestInternal*, const void* buffer, size_t len);
+			const char* requestString(u8 type) {
+				static const char* __typestring[] = {
+					[0]							=	"NONE",
+					[FASTCGI_BEGIN_REQUEST]		=	"BEGIN_REQUEST",
+					[FASTCGI_ABORT_REQUEST]		=	"ABORT_REQUEST",
+					[FASTCGI_END_REQUEST]		=	"END_REQUEST",
+					[FASTCGI_PARAMS]			=	"PARAMS",
+					[FASTCGI_STDIN]				=	"STDIN",
+					[FASTCGI_STDOUT]			=	"STDOUT",
+					[FASTCGI_STDERR]			=	"STDERR",
+					[FASTCGI_DATA]				=	"DATA",
+					[FASTCGI_GET_VALUES]		=	"GET_VALUES",
+					[FASTCGI_GET_VALUES_RESULT]	=	"GET_VALUES_RESULT",
+					[FASTCGI_UNKOWN_TYPE]		=	"UNKNOWN_TYPE"
+				};
+				return type < sizeof(__typestring) ? __typestring[type] : "NONE";
+			}
 	};
 			
 	void CgiServerInternal::stop() {
@@ -279,7 +296,7 @@ BEGIN_NAMESPACE_BUNDLE {
 				continue;
 			}
 
-			this->parsePackage(s, GET_MESSAGE_BY_PAYLOAD(msg), GET_MESSAGE_PAYLOAD_LENGTH(msg));
+			this->parsePackage(s, GET_MESSAGE_PAYLOAD(msg), GET_MESSAGE_PAYLOAD_LENGTH(msg));
 		}
 	}
 
@@ -298,8 +315,9 @@ BEGIN_NAMESPACE_BUNDLE {
 		fastcgi_header* header = (fastcgi_header *) buffer;
 		buffer = (u8*) buffer + sizeof(fastcgi_header);
 		len -= sizeof(fastcgi_header);
-		Debug.cout("fastcgi version: %d, type: %d, requestid: %d, content_length: %d, padding_length: %d",
-				header->version, header->type, header->requestid(), header->content_length(), header->padding_length);
+		Debug.cout("fastcgi version: %d, type: %s(%d), requestid: %d, content_length: %d, padding_length: %d",
+				header->version, this->requestString(header->type), header->type,
+				header->requestid(), header->content_length(), header->padding_length);
 
 		CgiRequestInternal* request = FindOrNull(this->_requests, header->requestid());
 		if (!request) {
@@ -333,7 +351,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	bool CgiServerInternal::beginRequest(CgiRequestInternal* request, const void* buffer, size_t len) {
 		assert(len >= sizeof(fastcgi_begin_request));
 		fastcgi_begin_request* msg = (fastcgi_begin_request *) buffer;
-		Debug << "role: " << msg->role() << ", flags: " << msg->flags;
+		Debug << "role: " << msg->role() << ", flags: " << (u32) msg->flags;
 		request->role((FASTCGI_ROLE) msg->role());
 		request->keepalive(msg->flags & FASTCGI_KEEP_ALIVE);
 		CHECK_RETURN(request->role() == FASTCGI_RESPONDER, false, "Only support response role: %d", request->role());
@@ -350,6 +368,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		size_t i = 0;
 		const char* data = (const char *) buffer;
 
+		Debug << "headers: ";
 		// FASTCGI_PARAMS FORMAT: LENGTH_KEY|VALUE_LENGTH|KEY|VALUE
 		// 	LENGTH:	1 or 4 bytes when LENGTH > 128 
 		// 	Sample: \x0B\x02SERVER_PORT80\x0B\x0ESERVER_ADDR199.170.183.42
@@ -372,7 +391,7 @@ BEGIN_NAMESPACE_BUNDLE {
 				u8 v2 = data[i++];
 				u8 v3 = data[i++];
 				len_value = ((len_value & 0x7f) << 24) + (v1 << 16) + (v2 << 8) + v3;
-				CHECK_RETURN(i < len, false, "readParams overflow, i: %ld, len: %ld", i, len);
+				CHECK_RETURN(i <= len, false, "readParams overflow, i: %ld, len: %ld", i, len);
 			}
 
 			std::string key, value;
@@ -380,9 +399,9 @@ BEGIN_NAMESPACE_BUNDLE {
 			i += len_key;
 			value.assign(&data[i], len_value);
 			i += len_value;
-			CHECK_RETURN(i < len, false, "readParams overflow, i: %ld, len: %ld", i, len);
+			CHECK_RETURN(i <= len, false, "readParams overflow, i: %ld, len: %ld", i, len);
 
-			Debug << "Key: " << key << ", Value: " << value;
+			Debug << "    Key: " << key << ", Value: " << value << ", length: " << value.length();
 
 			request->addHeader(key.c_str(), value.c_str());
 		}

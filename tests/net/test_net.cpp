@@ -380,7 +380,7 @@ enum protocolStatus {
 #pragma pack(pop)
 
 
-void test_net() {
+void test_net7() {
 	HttpParser parser;
 	ss = SocketServerCreator::create([&](const void* buffer, size_t len) -> int{
 			//fprintf(stderr, "len:%ld, fcgi_header:%ld\n", len, sizeof(fcgi_header));
@@ -487,3 +487,42 @@ void test_net() {
 
 	SafeDelete(ss);
 }
+
+
+// CgiServer
+void test_net() {
+	CgiServer* cgiserver = CgiServerCreator::create();
+	assert(cgiserver);
+	bool rc = cgiserver->start("127.0.0.1", 9000);
+	assert(rc);
+	while (!sConfig.halt) {
+		CgiRequest* request = cgiserver->getRequest();
+		if (request) {
+			auto& headers = request->headers();
+			Debug << "headers:";
+			for (auto& i : headers) {
+				Debug << "    Key:" << i.first << "," << i.second;
+			}
+			auto& variables = request->variables();
+			Debug << "variables:";
+			for (auto& i : variables) {
+				Debug << "    Key:" << i.first << "," << i.second;
+			}
+
+			char time_buffer[64];
+			timestamp(time_buffer, sizeof(time_buffer));
+
+			std::string html = "Content-type: text/html\r\n\r\n";	// response header
+			html += time_buffer;
+			request->sendString(html);
+			request->done();
+
+			cgiserver->releaseRequest(request);
+		}
+		else {
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));	
+		}
+	}
+	SafeDelete(cgiserver);
+}
+

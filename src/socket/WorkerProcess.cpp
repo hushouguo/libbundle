@@ -217,7 +217,10 @@ BEGIN_NAMESPACE_BUNDLE {
 
 	void WorkerProcess::removeSocket(SOCKET s, const char* reason) {
 		Socket* so = GET_SOCKET(s);
-		CHECK_ALARM(so != nullptr, "socket: %d not exist", s);
+		if (!so) {
+			Alarm << "socket: " << s << " not exist";
+			return;
+		}	// repeate removeSocket
 		this->_sockets[s] = nullptr;
 		SafeDelete(so);
 		this->_poll->removeSocket(s);
