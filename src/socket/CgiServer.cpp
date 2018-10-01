@@ -10,10 +10,10 @@
 BEGIN_NAMESPACE_BUNDLE {
 	enum FASTCGI_REQUEST_TYPE {
 		FASTCGI_BEGIN_REQUEST      	= 1,
-		FASTCGI_ABORT_REQUEST      	= 2,
+		FASTCGI_ABORT_REQUEST      	= 2,	// CgiServer-side to WebServer
 		FASTCGI_END_REQUEST        	= 3,
-		FASTCGI_PARAMS             	= 4,
-		FASTCGI_STDIN              	= 5,
+		FASTCGI_PARAMS             	= 4,	// on PHP: $_SERVERS, QUERY_STRING: $GETS
+		FASTCGI_STDIN              	= 5,	// $POSTS
 		FASTCGI_STDOUT             	= 6,
 		FASTCGI_STDERR             	= 7,
 		FASTCGI_DATA               	= 8,
@@ -49,7 +49,16 @@ BEGIN_NAMESPACE_BUNDLE {
 		unsigned char padding_length;
 		unsigned char reserved;
 		inline u32 requestid() { return (this->requestid_high << 8) + this->requestid_low; }
+		inline void requestid(u32 value) {
+			this->requestid_high = (value >> 8) & 0xff;
+			this->requestid_low = value & 0xff;
+		}
 		inline u32 content_length() { return (this->content_length_high << 8) + this->content_length_low; }
+		inline void content_length(u32 len) {
+			this->content_length_high = (len >> 8) & 0xff;
+			this->content_length_low = len & 0xff;
+			this->padding_length = (len % 8) > 0 ? 8 - (len % 8) : 0;	// align 8 bytes
+		}
 		inline u32 package_length() { return sizeof(fastcgi_header) + this->content_length() + this->padding_length; }
 	};
 
@@ -72,6 +81,134 @@ BEGIN_NAMESPACE_BUNDLE {
 	};
 #pragma pack(pop)
 	
+	class CgiRequestInternal : public CgiRequest {
+		public:
+			CgiRequestInternal(u32 id, SocketServer* socketServer);
+			~CgiRequestInternal();
+
+		public:
+			inline bool keepalive() { return this->_keepalive; }
+			void keepalive(bool value) { this->_keepalive = value; }
+			inline FASTCGI_ROLE role() { return this->_role; }
+			void role(FASTCGI_ROLE value) { this->_role = value; }
+			inline bool receiveParams() { return this->_receive_params; }
+			void receiveParams(bool value) { this->_receive_params = value; }
+			inline bool receiveStdin() { return this->_receive_stdin; }
+			void receiveStdin(bool value) { this->_receive_stdin = value; }
+			inline SOCKET fd() { return this->_socket; }
+			void fd(SOCKET s) { this->_socket = s; }
+			bool addHeader(const char* key, const char* value);
+			bool addVariable(const char* key, const char* value);
+
+		public:
+			u32 id() override { return this->_id; }
+			const char* header(const char* name) override {
+				auto i = this->_headers.find(name);
+				return i != this->_headers.end() ? i->second.c_str() : nullptr;
+			}
+			const char* variable(const char* name) override {
+				auto i = this->_variables.find(name);
+				return i != this->_variables.end() ? i->second.c_str() : nullptr;
+			}
+			const std::unordered_map<std::string, std::string>& headers() override {
+				return this->_headers;
+			}
+			const std::unordered_map<std::string, std::string>& variables() override {
+				return this->_variables;
+			}
+						
+			void sendString(const char*, size_t) override;
+			void sendString(const std::string&) override;
+			void sendString(const std::ostringstream&) override;
+			void sendBinary(const void*, size_t) override;
+			void done() override;
+
+		private:
+			u32 _id = 0;
+			SocketServer* _socketServer = nullptr;
+			SOCKET _socket = -1;
+			bool _keepalive = false;
+			bool _receive_params = false, _receive_stdin = false;
+			FASTCGI_ROLE _role = FASTCGI_RESPONDER;
+			std::unordered_map<std::string, std::string> _headers;
+			std::unordered_map<std::string, std::string> _variables;
+	};
+			
+	CgiRequestInternal::CgiRequestInternal(u32 id, SocketServer* socketServer) {
+		this->_id = id;
+		this->_socketServer = socketServer;
+	}
+
+	CgiRequest::~CgiRequest() {}
+	CgiRequestInternal::~CgiRequestInternal() {
+		this->_socketServer->close(this->_socket);
+	}
+
+	bool CgiRequestInternal::addHeader(const char* key, const char* value) {
+		return this->_headers.insert(std::make_pair(key, value)).second;
+	}
+
+	bool CgiRequestInternal::addVariable(const char* key, const char* value) {
+		return this->_variables.insert(std::make_pair(key, value)).second;
+	}
+
+	void CgiRequestInternal::sendString(const char* data, size_t len) {
+		if (len > 0) {
+			fastcgi_header header;
+			header.version = FASTCGI_VERSION;
+			header.type = FASTCGI_STDOUT;
+			header.requestid(this->_id);	// requestid_high && requestid_low
+			header.content_length(len);		// content_length_high && content_length_low && padding_length
+			header.reserved = 0;
+			this->_socketServer->sendMessage(this->_socket, &header, sizeof(fastcgi_header));
+			this->_socketServer->sendMessage(this->_socket, data, len);
+			if (header.padding_length > 0) {
+				u8 padding[header.padding_length];
+				this->_socketServer->sendMessage(this->_socket, padding, sizeof(padding));
+			}
+		}
+
+		if (true) {
+			fastcgi_header header;
+			header.version = FASTCGI_VERSION;
+			header.type = FASTCGI_STDOUT;
+			header.requestid(this->_id);	// requestid_high && requestid_low
+			header.content_length(0);		// end of stdout
+			header.reserved = 0;
+			this->_socketServer->sendMessage(this->_socket, &header, sizeof(fastcgi_header));
+		}
+	}
+
+	void CgiRequestInternal::sendString(const std::string& s) {
+		this->sendString(s.data(), s.length());
+	}
+
+	void CgiRequestInternal::sendString(const std::ostringstream& o) {
+		const std::string& s = o.str();
+		this->sendString(s);
+	}
+
+	void CgiRequestInternal::sendBinary(const void*, size_t) {
+	}
+
+	void CgiRequestInternal::done() {
+		fastcgi_header header;
+		header.version = FASTCGI_VERSION;
+		header.type = FASTCGI_END_REQUEST;
+		header.requestid(this->_id);			// requestid_high && requestid_low
+		header.content_length(sizeof(fastcgi_end_request));	// content_length_high && content_length_low && padding_length
+		header.reserved = 0;
+		this->_socketServer->sendMessage(this->_socket, &header, sizeof(fastcgi_header));
+
+		fastcgi_end_request body;
+		body.protocolStatus = FASTCGI_REQUEST_COMPLETE;
+		this->_socketServer->sendMessage(this->_socket, &body, sizeof(fastcgi_end_request));
+	}
+
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////
+	//
+		
 	class CgiServerInternal : public CgiServer {
 		public:
 			CgiServerInternal();
@@ -80,97 +217,79 @@ BEGIN_NAMESPACE_BUNDLE {
 		public:
 			SOCKET fd() override { return this->_socketServer->fd(); }
 			bool start(const char* address, int port) override { return this->_socketServer->start(address, port); }
-			void stop() override { this->_socketServer->stop(); }
-			const Socketmessage* receiveMessage() override;
-			void sendMessage(SOCKET s, const void*, size_t) override;
-			void close(SOCKET s) override { this->_socketServer->close(s); }
-			size_t size() override { this->_socketServer->size(); }
-			bool setsockopt(int opt, const void* optval, size_t optlen) override { 
-				return this->_socketServer->setsockopt(opt, optval, optlen); 
-			}
-			bool getsockopt(int opt, void* optval, size_t optlen) override {
-				return this->_socketServer->getsockopt(opt, optval, optlen);
-			}
-
-		public:
-			void sendString(SOCKET, const char*, size_t) override;
-			void sendString(SOCKET, const std::string&) override;
-			void sendString(SOCKET, const std::ostringstream&) override;
-			void sendBinary(SOCKET, const void*, size_t) override;
+			void stop() override;
+//			bool setsockopt(int opt, const void* optval, size_t optlen) override { 
+//				return this->_socketServer->setsockopt(opt, optval, optlen); 
+//			}
+//			bool getsockopt(int opt, void* optval, size_t optlen) override {
+//				return this->_socketServer->getsockopt(opt, optval, optlen);
+//			}
+			CgiRequest* getRequest() override;
+			void releaseRequest(CgiRequest*) override;
 
 		private:
 			SocketServer* _socketServer = nullptr;
-			bool parsePackage(SOCKET s, const void* buffer, size_t len);
-			bool beginRequest(SOCKET s, const void* buffer, size_t len);
-			bool readParams(SOCKET s, const void* buffer, size_t len);
-			bool readStdin(SOCKET s, const void* buffer, size_t len);
-			bool readData(SOCKET s, const void* buffer, size_t len);
+			std::unordered_map<u32, CgiRequestInternal*> _requests;
+			CgiRequest* getCompleteRequest();
+			bool parsePackage(SOCKET, const void* buffer, size_t len);
+			bool beginRequest(CgiRequestInternal*, const void* buffer, size_t len);
+			bool readParams(CgiRequestInternal*, const void* buffer, size_t len);
+			bool readStdin(CgiRequestInternal*, const void* buffer, size_t len);
+			bool readData(CgiRequestInternal*, const void* buffer, size_t len);
 	};
-
-	bool CgiServerInternal::beginRequest(SOCKET s, const void* buffer, size_t len) {
-		assert(len >= sizeof(fastcgi_begin_request));
-		fastcgi_begin_request* request = (fastcgi_begin_request *) buffer;
-		Debug << "role: " << request->role() << ", flags: " << request->flags;
-		CHECK_REUTNR(request->role() == FASTCGI_RESPONDER, false, "Only support response role: %d", request->role());
-		return true;
+			
+	void CgiServerInternal::stop() {
+		Debug << "CgiServer unhandled request: " << this->_requests.size();
+		for (auto& i : this->_requests) {
+			CgiRequest* request = i.second;
+			SafeDelete(request);
+		}
+		SafeDelete(this->_socketServer);
 	}
 
-	// For GET command, exist key is QUERY_STRING, value is like: id=1&name=hushouguo
-	bool CgiServerInternal::readParams(SOCKET s, const void* buffer, size_t len) {
-		if (len == 0) {
-			return true;	// read params done, it's the last package with content_length == 0
+	CgiRequest* CgiServerInternal::getCompleteRequest() {
+		CgiRequest* request = nullptr;
+		if (!this->_requests.empty()) {
+			u32 requestid = 0;
+			for (auto& i : this->_requests) {
+				if (i.second->receiveParams() && i.second->receiveStdin()) {
+					requestid = i.first;
+					break;
+				}
+			}
+			auto i = this->_requests.find(requestid);
+			if (i != this->_requests.end()) {
+				request = i->second;
+				this->_requests.erase(i);
+			}
 		}
-		
-		size_t i = 0;
-		const u8 * data = (const u8 *) buffer;
+		return request;
+	}
 
-		// FASTCGI_PARAMS FORMAT: LENGTH_KEY|VALUE_LENGTH|KEY|VALUE
-		// 	LENGTH:	1 or 4 bytes when LENGTH > 128 
-		// 	Sample: \x0B\x02SERVER_PORT80\x0B\x0ESERVER_ADDR199.170.183.42
-		//
-		while (i < len) {
-			u32 len_key = data[i++];
-			CHECK_RETURN(i < len, false, "readParams overflow, i: %ld, len: %ld", i, len);
-			if ((len_key & 0x80) != 0) {	// > 128
-				len_key = ((len_key & 0x7f) << 24) + (data[i++] << 16) + (data[i++] << 8) + data[i++];
-				CHECK_RETURN(i < len, false, "readParams overflow, i: %ld, len: %ld", i, len);
+	CgiRequest* CgiServerInternal::getRequest() {
+		while (true) {
+			Socketmessage* msg = (Socketmessage *) this->_socketServer->receiveMessage();
+			if (!msg) {
+				return this->getCompleteRequest();
 			}
 
-			u32 len_value = data[i++];
-			CHECK_RETURN(i < len, false, "readParams overflow, i: %ld, len: %ld", i, len);
-			if ((len_value & 0x80) != 0) {	// > 128
-				len_value = ((len_value & 0x7f) << 24) + (data[i++] << 16) + (data[i++] << 8) + data[i++];
-				CHECK_RETURN(i < len, false, "readParams overflow, i: %ld, len: %ld", i, len);
+			SOCKET s = GET_MESSAGE_SOCKET(msg);
+			if (IS_ESTABLISH_MESSAGE(msg) || IS_CLOSE_MESSAGE(msg)) {
+				bundle::releaseMessage(msg);
+				continue;
 			}
 
-			std::string key, value;
-			key.assign(&data[i], len_key);
-			i += len_key;
-			value.assign(&data[i], len_value);
-			i += len_value;
-			CHECK_RETURN(i < len, false, "readParams overflow, i: %ld, len: %ld", i, len);
-
-			Debug << "Key: " << key << ", Value: " << value;
+			this->parsePackage(s, GET_MESSAGE_BY_PAYLOAD(msg), GET_MESSAGE_PAYLOAD_LENGTH(msg));
 		}
-
-		Debug << "readParams, i: " << i << ", len: " << len;
-		return true;
-	}
-		
-	// STDIN pass value of POST, just like: var1=1&var2=husosdgfsdfg&var3=%25E4%25BD%25A0%25E5
-	bool CgiServerInternal::readStdin(SOCKET s, const void* buffer, size_t len) {
-		if (len == 0) {
-			return true;	// read stdin done, it's the last package with content_length == 0
-		}
-		//TODO: parse
-		return true;
 	}
 
-	bool CgiServerInternal::readData(SOCKET s, const void* buffer, size_t len) {
-		if (len == 0) {
-			return true;	// read stdin done, it's the last package with content_length == 0
+	void CgiServerInternal::releaseRequest(CgiRequest* request) {
+		Debug << "release request: " << request->id();
+		auto i = this->_requests.find(request->id());
+		if (i != this->_requests.end()) {
+			this->_requests.erase(i);
 		}
-		return true;
+		SafeDelete(request);
 	}
 
 	bool CgiServerInternal::parsePackage(SOCKET s, const void* buffer, size_t len) {
@@ -182,36 +301,111 @@ BEGIN_NAMESPACE_BUNDLE {
 		Debug.cout("fastcgi version: %d, type: %d, requestid: %d, content_length: %d, padding_length: %d",
 				header->version, header->type, header->requestid(), header->content_length(), header->padding_length);
 
-		switch (header->type) {
-			// BeginRequest
-			case FASTCGI_BEGIN_REQUEST: return this->beginRequest(s, buffer, len); break;
-			// PARAMS: HEADERS
-			case FASTCGI_PARAMS: return this->readParams(s, buffer, len); break;
-			// STDIN: POST
-			case FASTCGI_STDIN: return this->readStdin(s, buffer, len); break;
-			// DATA
-			case FASTCGI_DATA: return this->readData(s, buffer, len); break;
+		CgiRequestInternal* request = FindOrNull(this->_requests, header->requestid());
+		if (!request) {
+			request = new CgiRequestInternal(header->requestid(), this->_socketServer);
+			request->fd(s);
+			this->_requests.insert(std::make_pair(request->id(), request));
+			Debug << "spawn new request: " << request->id() << ", fd: " << request->fd();
 		}
+		assert(request->fd() == s);
+
+		bool rc = false;
+		switch (header->type) {
+			case FASTCGI_BEGIN_REQUEST: 
+				rc = this->beginRequest(request, buffer, len); break;
+			case FASTCGI_PARAMS: 
+				rc = this->readParams(request, buffer, len); break;
+			case FASTCGI_STDIN: 
+				rc = this->readStdin(request, buffer, len); break;
+			case FASTCGI_DATA: 
+				rc = this->readData(request, buffer, len); break;
+			default: 
+				Alarm << "Unhandle FASTCGI header: " << (u32) header->type; break;
+		}
+
+		if (!rc) {
+			this->releaseRequest(request);
+		}
+		return rc;
 	}
 
-	const Socketmessage* CgiServerInternal::receiveMessage() {
-        Socketmessage* msg = (Socketmessage *) this->_socketServer->receiveMessage();
-        if (!msg) {
-        	return nullptr;
-        }
+	bool CgiServerInternal::beginRequest(CgiRequestInternal* request, const void* buffer, size_t len) {
+		assert(len >= sizeof(fastcgi_begin_request));
+		fastcgi_begin_request* msg = (fastcgi_begin_request *) buffer;
+		Debug << "role: " << msg->role() << ", flags: " << msg->flags;
+		request->role((FASTCGI_ROLE) msg->role());
+		request->keepalive(msg->flags & FASTCGI_KEEP_ALIVE);
+		CHECK_RETURN(request->role() == FASTCGI_RESPONDER, false, "Only support response role: %d", request->role());
+		return true;
+	}
 
-		SOCKET s = GET_MESSAGE_SOCKET(msg);
-
-        if (IS_ESTABLISH_MESSAGE(msg)) {
-        	bundle::releaseMessage(msg);
-        	return nullptr;
-        }
-
-        if (IS_CLOSE_MESSAGE(msg)) {
-        	return msg;	// connection close
-        }
+	// For GET command, exist key is QUERY_STRING, value is like: id=1&name=hushouguo
+	bool CgiServerInternal::readParams(CgiRequestInternal* request, const void* buffer, size_t len) {
+		if (len == 0) {
+			request->receiveParams(true);
+			return true;	// read params done, it's the last package with content_length == 0
+		}
 		
-			
+		size_t i = 0;
+		const char* data = (const char *) buffer;
+
+		// FASTCGI_PARAMS FORMAT: LENGTH_KEY|VALUE_LENGTH|KEY|VALUE
+		// 	LENGTH:	1 or 4 bytes when LENGTH > 128 
+		// 	Sample: \x0B\x02SERVER_PORT80\x0B\x0ESERVER_ADDR199.170.183.42
+		//
+		while (i < len) {
+			u32 len_key = data[i++];
+			CHECK_RETURN(i < len, false, "readParams overflow, i: %ld, len: %ld", i, len);
+			if ((len_key & 0x80) != 0) {	// > 128
+				u8 v1 = data[i++];
+				u8 v2 = data[i++];
+				u8 v3 = data[i++];
+				len_key = ((len_key & 0x7f) << 24) + (v1 << 16) + (v2 << 8) + v3;
+				CHECK_RETURN(i < len, false, "readParams overflow, i: %ld, len: %ld", i, len);
+			}
+
+			u32 len_value = data[i++];
+			CHECK_RETURN(i < len, false, "readParams overflow, i: %ld, len: %ld", i, len);
+			if ((len_value & 0x80) != 0) {	// > 128
+				u8 v1 = data[i++];
+				u8 v2 = data[i++];
+				u8 v3 = data[i++];
+				len_value = ((len_value & 0x7f) << 24) + (v1 << 16) + (v2 << 8) + v3;
+				CHECK_RETURN(i < len, false, "readParams overflow, i: %ld, len: %ld", i, len);
+			}
+
+			std::string key, value;
+			key.assign(&data[i], len_key);
+			i += len_key;
+			value.assign(&data[i], len_value);
+			i += len_value;
+			CHECK_RETURN(i < len, false, "readParams overflow, i: %ld, len: %ld", i, len);
+
+			Debug << "Key: " << key << ", Value: " << value;
+
+			request->addHeader(key.c_str(), value.c_str());
+		}
+
+		Debug << "readParams, i: " << i << ", len: " << len;
+		return true;
+	}
+		
+	// STDIN pass value of POST, just like: var1=1&var2=husosdgfsdfg&var3=%25E4%25BD%25A0%25E5
+	bool CgiServerInternal::readStdin(CgiRequestInternal* request, const void* buffer, size_t len) {
+		if (len == 0) {
+			request->receiveStdin(true);
+			return true;	// read stdin done, it's the last package with content_length == 0
+		}
+		//TODO: parse
+		return true;
+	}
+
+	bool CgiServerInternal::readData(CgiRequestInternal* request, const void* buffer, size_t len) {
+		if (len == 0) {
+			return true;	// read stdin done, it's the last package with content_length == 0
+		}
+		return true;
 	}
 
 
