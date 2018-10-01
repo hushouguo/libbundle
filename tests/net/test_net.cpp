@@ -329,6 +329,9 @@ struct fcgi_header {
     unsigned char contentlengthB0;
     unsigned char paddinglength;
     unsigned char reserved;
+	u32 contentlength() {
+		return (this->contentlengthB1 << 8) + this->contentlengthB0;
+	}
 };
 
 enum fcgi_request_type {
@@ -416,7 +419,8 @@ void test_net() {
 				fcgi_header* header = (fcgi_header*) payload;
 				payload = (u8*) payload + sizeof(fcgi_header);
 				u32 requestid = (header->requestidB1 << 8) + header->requestidB0;
-				u32 contentlength = (header->contentlengthB1 << 8) + header->contentlengthB0;
+				//u32 contentlength = (header->contentlengthB1 << 8) + header->contentlengthB0;
+				u32 contentlength = header->contentlength();
 				Debug << "version:" << (u32) header->version;
 				Debug << "type:" << (u32) header->type;
 				Debug << "requestid:" << requestid;
