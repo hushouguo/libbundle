@@ -184,6 +184,12 @@ BEGIN_NAMESPACE_BUNDLE {
 	bool init_runtime_environment(int argc, char* argv[]);
 	void shutdown_bundle_library();
 
+
+	//
+	// decode jscode to session_key & openid
+	bool decode_jscode(std::string appid, std::string appsecret, std::string jscode, void* userdata, std::function<void(std::string, std::string, void*)> func);
+
+	
 	//
 	// install signal handler
 	template <typename HANDLER>

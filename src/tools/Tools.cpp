@@ -1016,5 +1016,87 @@ BEGIN_NAMESPACE_BUNDLE {
 			strcpy(argv[i], __argv[i].c_str());
 		}
 	}
+
+	
+	struct CurlContext {
+		void* userdata;
+		std::function<void(std::string, std::string, void*)> callback;
+		CurlContext(void* p, std::function<void(std::string, std::string, void*)> func) : userdata(p), callback(func) {}
+	};
+
+	//
+	//	OK:
+	//	{
+    //		"openid": "OPENID",
+    //		"session_key": "SESSIONKEY"
+	//	}
+	//
+	//	Error:
+	//	{
+    //		"errcode": 40029,
+    //		"errmsg": "invalid code"
+	//	}
+	//
+	static size_t curlWriteCallback(const char* ptr, size_t size, size_t nmemb, CurlContext* context) {
+		void* userdata = context->userdata;
+		std::function<void(std::string, std::string, void*)> func = context->callback;
+		SafeDelete(context)
+
+		Debug << "curlWriteCallback: " << ptr;
+	
+		rapidjson::Document document;  // Default template parameter uses UTF8 and MemoryPoolAllocator.
+		bool rc = document.Parse(ptr).HasParseError();
+		CHECK_RETURN(rc == false, size * nmemb, "parse curlWriteCallback: %s error", ptr);
+	
+#ifdef PARSE_FIELD
+#undef PARSE_FIELD
+#endif
+	
+#define PARSE_FIELD(VAR, NAME, TYPE)	\
+			CHECK_RETURN(document.HasMember(NAME), size * nmemb, "lack field: "#NAME);\
+			rapidjson::Value& VAR = document[NAME];\
+			CHECK_RETURN(VAR.Is##TYPE(), size * nmemb, "error type: "#TYPE);
+	
+		PARSE_FIELD(sessionkeyValue, "session_key", String);
+		PARSE_FIELD(openidValue, "openid", String);
+	
+		std::string session_key = sessionkeyValue.GetString();
+		std::string openid = openidValue.GetString();
+
+		Debug.cout("session_key: %s, openid: %s", session_key.c_str(), openid.c_str());
+		
+#undef PARSE_FIELD
+
+		func(session_key, openid, userdata);
+		
+		return size * nmemb;  
+	}
+	
+
+	//
+	// decode jscode to session_key & openid, session_key is empty means error happen
+	bool decode_jscode(std::string appid, std::string appsecret, std::string jscode, void* userdata, std::function<void(std::string, std::string, void*)> func) {
+		std::ostringstream url;
+		url << "https://api.weixin.qq.com/sns/jscode2session?appid=" << appid;
+		url << "&secret=" << appsecret << "&js_code=" << jscode << "&grant_type=authorization_code";
+		Debug << "url: " << url.str();
+		CURL* easy_handle = curl_easy_init();
+		CHECK_RETURN(easy_handle, false, "curl_easy_init failure");
+		CurlContext* context = new CurlContext(userdata, func);
+		curl_easy_setopt(easy_handle, CURLOPT_URL, url.str());
+		curl_easy_setopt(easy_handle, CURLOPT_SSL_VERIFYPEER, true);
+		curl_easy_setopt(easy_handle, CURLOPT_READFUNCTION, nullptr);  
+		curl_easy_setopt(easy_handle, CURLOPT_WRITEFUNCTION, curlWriteCallback);
+		curl_easy_setopt(easy_handle, CURLOPT_WRITEDATA, context);
+		CURLcode rc = curl_easy_perform(easy_handle);
+		//CHECK_RETURN(rc == CURLE_OK, false, "perform curl error: %d, %s", rc, curl_easy_strerror(rc));
+		if (rc != CURLE_OK) {
+			Error.cout("perform curl error: %d, %s", rc, curl_easy_strerror(rc));
+			SafeDelete(context);
+			return false;
+		}		
+		curl_easy_cleanup(easy_handle);
+		return true;
+	}
 }
 
