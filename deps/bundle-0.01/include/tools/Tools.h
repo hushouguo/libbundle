@@ -187,7 +187,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 	//
 	// decode jscode to session_key & openid
-	bool decode_jscode(std::string appid, std::string appsecret, std::string jscode, void* userdata, std::function<void(std::string, std::string, void*)> func);
+	bool decode_jscode(std::string appid, std::string appsecret, std::string jscode, void* userdata, std::function<void(bool, std::string, std::string, void*)> func);
 
 	
 	//

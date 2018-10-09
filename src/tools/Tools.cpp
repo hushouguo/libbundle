@@ -1020,8 +1020,8 @@ BEGIN_NAMESPACE_BUNDLE {
 	
 	struct CurlContext {
 		void* userdata;
-		std::function<void(std::string, std::string, void*)> callback;
-		CurlContext(void* p, std::function<void(std::string, std::string, void*)> func) : userdata(p), callback(func) {}
+		std::function<void(bool, std::string, std::string, void*)> callback;
+		CurlContext(void* p, std::function<void(bool, std::string, std::string, void*)> func) : userdata(p), callback(func) {}
 	};
 
 	//
@@ -1046,26 +1046,35 @@ BEGIN_NAMESPACE_BUNDLE {
 	
 		rapidjson::Document document;  // Default template parameter uses UTF8 and MemoryPoolAllocator.
 		bool rc = document.Parse(ptr).HasParseError();
-		CHECK_RETURN(rc == false, size * nmemb, "parse curlWriteCallback: %s error", ptr);
-	
-#ifdef PARSE_FIELD
-#undef PARSE_FIELD
-#endif
-	
-#define PARSE_FIELD(VAR, NAME, TYPE)	\
-			CHECK_RETURN(document.HasMember(NAME), size * nmemb, "lack field: "#NAME);\
-			rapidjson::Value& VAR = document[NAME];\
-			CHECK_RETURN(VAR.Is##TYPE(), size * nmemb, "error type: "#TYPE);
-	
-		PARSE_FIELD(sessionkeyValue, "session_key", String);
-		PARSE_FIELD(openidValue, "openid", String);
-	
-		std::string session_key = sessionkeyValue.GetString();
-		std::string openid = openidValue.GetString();
+		//CHECK_RETURN(rc == false, size * nmemb, "parse curlWriteCallback: %s error", ptr);
+		if (rc == false) {
+			func(false, "ParseCallbackError", ptr, userdata);
+			return size * nmemb;
+		}
 
-		Debug.cout("session_key: %s, openid: %s", session_key.c_str(), openid.c_str());
+		std::string errmsg = ptr;
+		if (document.HasMember("errcode")) {
+			if (document.HasMember("errmsg") && document["errmsg"].IsString()) {
+				errmsg = document["errmsg"].GetString();
+			}
+			func(false, "errcode", errmsg, userdata);
+			return size * nmemb;
+		}
 		
-#undef PARSE_FIELD
+		if (!document.HasMember("session_key") || document['session_key'].IsString()) {
+			func(false, "not found `session_key`", errmsg, userdata);
+			return size * nmemb;
+		}
+		
+		if (!document.HasMember("openid") || !document['openid'].IsString()) {
+			func(false, "not found `openid`", errmsg, userdata);
+			return size * nmemb;
+		}
+
+		std::string session_key = document['session_key'].GetString();
+		std::string openid = document['openid'].GetString();
+
+		Debug << "session_key: " << session_key << ", openid: " << openid;
 
 		func(session_key, openid, userdata);
 		
@@ -1075,7 +1084,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 	//
 	// decode jscode to session_key & openid, session_key is empty means error happen
-	bool decode_jscode(std::string appid, std::string appsecret, std::string jscode, void* userdata, std::function<void(std::string, std::string, void*)> func) {
+	bool decode_jscode(std::string appid, std::string appsecret, std::string jscode, void* userdata, std::function<void(bool, std::string, std::string, void*)> func) {
 		std::ostringstream url;
 		url << "https://api.weixin.qq.com/sns/jscode2session?appid=" << appid;
 		url << "&secret=" << appsecret << "&js_code=" << jscode << "&grant_type=authorization_code";
@@ -1092,6 +1101,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		//CHECK_RETURN(rc == CURLE_OK, false, "perform curl error: %d, %s", rc, curl_easy_strerror(rc));
 		if (rc != CURLE_OK) {
 			Error.cout("perform curl error: %d, %s", rc, curl_easy_strerror(rc));
+			func(false, "error", curl_easy_strerror(rc), userdata);
 			SafeDelete(context);
 			return false;
 		}		
