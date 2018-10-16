@@ -7,22 +7,33 @@
 #define __CGISERVER_H__
 
 BEGIN_NAMESPACE_BUNDLE {
+	enum HTTP_COMMAND {
+		GET, POST	// HEAD, PUT, DELETE, CONNECT, OPTIONS, TRACE		
+	};
+
 	class CgiRequest {
 		public:
 			virtual ~CgiRequest() = 0;
 
 		public:
 			virtual u32 id() = 0;
-			virtual const char* header(const char* name) = 0;
-			virtual const char* variable(const char* name) = 0;
-			virtual const std::unordered_map<std::string, std::string>& headers() = 0;
-			virtual const std::unordered_map<std::string, std::string>& variables() = 0;
+			virtual HTTP_COMMAND cmd() = 0;
+			virtual const char* url() = 0;
+			virtual const char* inputHeader(const char* name) = 0;
+			virtual const char* inputVariable(const char* name) = 0;
+			virtual const std::unordered_map<std::string, std::string>& inputHeaders() = 0;
+			virtual const std::unordered_map<std::string, std::string>& inputVariables() = 0;
 						
-			virtual void sendString(const char*, size_t) = 0;
-			virtual void sendString(const std::string&) = 0;
-			virtual void sendString(const std::ostringstream&) = 0;
-			virtual void sendBinary(const void*, size_t) = 0;
-			virtual void done() = 0;
+			virtual void addHeader(const char* name, const char* value) = 0;
+			virtual void addString(const char*, size_t) = 0;
+			virtual void addString(const std::string&) = 0;
+			virtual void addString(const std::ostringstream&) = 0;
+			virtual void send() = 0;
+
+			virtual void setCookie(const char* name, u32 seconds) = 0;			
+			virtual void setCookie(const char* name, const char* value, u32 seconds) = 0;
+			virtual const char* cookie(const char* name) = 0;
+			virtual const std::unordered_map<std::string, std::string>& cookies() = 0;
 	};
 
 	class CgiServer {
@@ -33,12 +44,6 @@ BEGIN_NAMESPACE_BUNDLE {
 			virtual SOCKET fd() = 0;
 			virtual bool start(const char* address, int port) = 0;
 			virtual void stop() = 0;
-			//virtual const Socketmessage* receiveMessage() = 0;
-			//virtual void sendMessage(SOCKET s, const void*, size_t) = 0;
-			//virtual void close(SOCKET s) = 0;
-			//virtual size_t size() = 0;
-			//virtual bool setsockopt(int opt, const void* optval, size_t optlen) = 0;
-			//virtual bool getsockopt(int opt, void* optval, size_t optlen) = 0;
 
 		public:
 			virtual CgiRequest* getRequest() = 0;

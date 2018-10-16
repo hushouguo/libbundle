@@ -269,7 +269,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			//std::unordered_map<EasylogSeverityLevel, EasylogLevelNode> _levels = {
 			std::map<EasylogSeverityLevel, EasylogLevelNode> _levels = {
 				{ LEVEL_DEBUG, 
-{ level:LEVEL_DEBUG, color:LBLUE, to_stdout:true, filename:"", fullname:"", fs:nullptr, fs_launchtime:0
+{ level:LEVEL_DEBUG, color:CYAN, to_stdout:true, filename:"", fullname:"", fs:nullptr, fs_launchtime:0
 #ifdef HAS_LOG_LAYOUT
 , layouts_prefix:{}, layouts_postfix:{} 
 #endif

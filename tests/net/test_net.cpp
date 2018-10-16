@@ -498,24 +498,30 @@ void test_net() {
 	while (!sConfig.halt) {
 		CgiRequest* request = cgiserver->getRequest();
 		if (request) {
-			auto& headers = request->headers();
-			Debug << "headers:";
+			auto& headers = request->inputHeaders();
+			Debug << "headers: " << headers.size();
 			for (auto& i : headers) {
 				Debug << "    Key:" << i.first << "," << i.second;
 			}
-			auto& variables = request->variables();
-			Debug << "variables:";
+			auto& variables = request->inputVariables();
+			Debug << "variables: " << variables.size();
 			for (auto& i : variables) {
+				Debug << "    Key:" << i.first << "," << i.second;
+			}
+			auto& cookies = request->cookies();
+			Debug << "cookies: " << cookies.size();
+			for (auto& i : cookies) {
 				Debug << "    Key:" << i.first << "," << i.second;
 			}
 
 			char time_buffer[64];
 			timestamp(time_buffer, sizeof(time_buffer));
 
-			std::string html = "Content-type: text/html\r\n\r\n";	// response header
-			html += time_buffer;
-			request->sendString(html);
-			request->done();
+			std::ostringstream o;
+			o << "hello, 当前时间: " << time_buffer;
+			request->addString(o.str());
+			request->setCookie(time_buffer, 10);
+			request->send();
 
 			cgiserver->releaseRequest(request);
 		}

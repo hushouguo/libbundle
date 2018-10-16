@@ -150,6 +150,27 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 #endif
 
+	const char* timestamp_gmt(char* buffer, size_t len, u64 seconds) {
+		struct timeval tv = { tv_sec: (time_t) seconds, tv_usec: 0 };
+		if (tv.tv_sec == 0) {
+			gettimeofday(&tv, nullptr);
+		}
+
+		// Sat, 11 Mar 2017 21:49:51 GMT
+		const char* time_format = "%a, %d %b %Y %H:%M:%S GMT";
+
+#ifdef CONVERT_CST_TIME
+		// utc -> cst
+		tv.tv_sec += 8 * 3600;
+#endif
+
+		struct tm result;
+		gmtime_r(&tv.tv_sec, &result);
+
+		std::strftime(buffer, len, time_format, &result);
+
+		return (const char *) buffer;
+	}
 
 	//
 	// hash string
@@ -1105,6 +1126,34 @@ BEGIN_NAMESPACE_BUNDLE {
 		}		
 		curl_easy_cleanup(easy_handle);
 		return true;
+	}
+	
+
+	//
+	// url encode & decode 
+	bool url_encode(const std::string& url, std::string& url_encoded) {
+		CURL* curl = curl_easy_init();
+		assert(curl);
+		char* encode_string = curl_easy_escape(curl, url.c_str(), url.length());
+		if (encode_string != nullptr) {
+			url_encoded.assign(encode_string);
+			curl_free(encode_string);
+		}
+		curl_easy_cleanup(curl);
+		return !url_encoded.empty();
+	}
+
+	bool url_decode(const std::string& url_encoded, std::string& url) {
+		CURL* curl = curl_easy_init();
+		assert(curl);
+		int length = 0;
+		char* decode_string = curl_easy_unescape(curl, url_encoded.c_str(), url_encoded.length(), &length);
+		if (decode_string != nullptr) {
+			url.assign(decode_string, length);
+			curl_free(decode_string);
+		}
+		curl_easy_cleanup(curl);
+		return !url.empty();
 	}
 }
 

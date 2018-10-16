@@ -195,6 +195,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	//========================================================================================
 	//
 	void WorkerProcess::newSocket(SOCKET newfd, bool is_listening) {
+		//System << "WorkerProcess::newSocket: " << newfd;
 		Socket* so = GET_SOCKET(newfd);
 		assert(so == nullptr);
 		if (this->_opts[BUNDLE_SOL_MAXSIZE] != 0 && this->_totalConnections >= this->_opts[BUNDLE_SOL_MAXSIZE]) {
@@ -216,14 +217,15 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	void WorkerProcess::removeSocket(SOCKET s, const char* reason) {
+		//System << "WorkerProcess::removeSocket: " << s << ", reason: " << reason;
 		Socket* so = GET_SOCKET(s);
 		if (!so) {
 			Alarm << "socket: " << s << " not exist";
 			return;
 		}	// repeate removeSocket
 		this->_sockets[s] = nullptr;
-		SafeDelete(so);
 		this->_poll->removeSocket(s);
+		SafeDelete(so);
 		Socketmessage* msg = allocateMessage(s, SM_OPCODE_CLOSE);
 		//
 		// throw close message

@@ -19,6 +19,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	bool Poll::addSocket(SOCKET s) {
+		//System << "Poll::addSocket: " << s;
 		struct epoll_event ee;
 		ee.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLERR;
 		ee.data.u64 = 0; /* avoid valgrind warning */
@@ -29,6 +30,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	bool Poll::removeSocket(SOCKET s) {
+		//System << "Poll::removeSocket: " << s;
 		struct epoll_event ee;
 		ee.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLERR;
 		ee.data.u64 = 0; /* avoid valgrind warning */

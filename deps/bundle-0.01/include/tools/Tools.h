@@ -28,7 +28,8 @@ BEGIN_NAMESPACE_BUNDLE {
 	// get current timestamp
 	//	if time_format is nullptr, default value is "%y/%02m/%02d %02H:%02M:%02S", like: 18/06/29 15:04:18
 	const char* timestamp(char* buffer, size_t len, u64 seconds = 0, const char* time_format = nullptr);
-
+	// GMT timestamp, HTTP date format, like: Sat, 11 Mar 2017 21:49:51 GMT
+	const char* timestamp_gmt(char* buffer, size_t len, u64 seconds = 0);
 
 	//
 	// hash string
@@ -189,6 +190,10 @@ BEGIN_NAMESPACE_BUNDLE {
 	// decode jscode to session_key & openid
 	bool decode_jscode(std::string appid, std::string appsecret, std::string jscode, void* userdata, std::function<void(bool, std::string, std::string, void*)> func);
 
+	//
+	// url encode & decode 
+	bool url_encode(const std::string& url, std::string& url_encoded);
+	bool url_decode(const std::string& url_encoded, std::string& url);
 	
 	//
 	// install signal handler
