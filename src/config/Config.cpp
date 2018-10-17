@@ -50,9 +50,10 @@ BEGIN_NAMESPACE_BUNDLE {
 						int status = 0;
 						waitpid(pid, &status, 0);
 						if (status == 1) {
-							fprintf(stderr, "status: %d\n", status);
+							fprintf(stderr, "childProcess status: %d on exit\n", status);
 							::exit(0);	// status == 1 means childProcess exit on init stage
 						}
+						fprintf(stderr, "Guard find childProcess exit with status: %d\n", status);
 						resetProcesstitle(argc, argv);
 					}
 					else { break; }
