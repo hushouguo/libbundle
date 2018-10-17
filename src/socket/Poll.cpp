@@ -72,12 +72,16 @@ BEGIN_NAMESPACE_BUNDLE {
 				this->_slotWorker->errorSocket(ee->data.fd);
 			}
 			else {
+				bool rc = true;
 				if (ee->events & EPOLLIN) {
-					this->_slotWorker->readSocket(ee->data.fd);
+					if (rc) { 
+						rc = this->_slotWorker->readSocket(ee->data.fd); 
+					}
 				}
-
 				if (ee->events & EPOLLOUT) {
-					this->_slotWorker->writeSocket(ee->data.fd);
+					if (rc) {
+						rc = this->_slotWorker->writeSocket(ee->data.fd);
+					}
 				}
 			}
 		}

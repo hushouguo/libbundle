@@ -16,6 +16,7 @@ BEGIN_NAMESPACE_BUNDLE {
 				nonblocking(this->fd());
 				assert(slotWorker);
 				this->_slotWorker = slotWorker;
+				memset(this->_countMessage, 0, sizeof(this->_countMessage));
 			}
 
 			~Socket() {

@@ -864,7 +864,12 @@ BEGIN_NAMESPACE_BUNDLE {
 		//
 		// Config information
 		//
-		Trace.cout("refer to config file: %s", sConfig.confile.empty() ? "not configure" : sConfig.confile.c_str());
+		if (sConfig.confile.empty()) {
+			Alarm << "specify config file: Unspecified";
+		}
+		else {
+			Trace << "specify config file: " << sConfig.confile;
+		}
 		sConfig.dump();
 
 
@@ -902,6 +907,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		sigemptyset(&act.sa_mask);
 		act.sa_flags = SA_INTERRUPT; //The system call that is interrupted by this signal will not be restarted automatically
 		act.sa_handler = [](int sig) {
+			//fprintf(stderr, "receive signal: %d\n", sig);
 			// Don't call Non reentrant function, just like malloc, free etc, i/o function also cannot call.
 			if (sig == SIGRTMIN) {		// SIGRTMIN: Wake up thread, nothing to do
 				return;	// SIGRTMIN: #define SIGRTMIN        (__libc_current_sigrtmin ())
@@ -956,7 +962,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			Trace << "shard: " << shard;
 		}
 		else {
-			Alarm << "shard: not configure (shard.id)";
+			Alarm << "shard: Unspecified (shard.id)";
 		}
 
 		//

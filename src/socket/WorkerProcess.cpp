@@ -112,15 +112,14 @@ BEGIN_NAMESPACE_BUNDLE {
 		return true;
 	}
 	
-	void WorkerProcess::readSocket(SOCKET s) {
+	bool WorkerProcess::readSocket(SOCKET s) {
 		Socket* so = GET_SOCKET(s);
-		CHECK_RETURN(so, void(0), "readSocket: %d, not found Socket", s);
+		CHECK_RETURN(so, false, "readSocket: %d, not found Socket", s);
 		if (so->is_listening()) {
 			this->acceptSocket(so);	
+			return true;
 		}
-		else {
-			this->readSocket(so);
-		}
+		return this->readSocket(so);
 	}
 	
 	void WorkerProcess::acceptSocket(Socket* so) {
@@ -149,7 +148,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		}
 	}
 
-	void WorkerProcess::readSocket(Socket* so) {
+	bool WorkerProcess::readSocket(Socket* so) {
 		assert(so);
 		assert(!so->is_listening());
 		while (!this->isstop()) {
@@ -159,7 +158,7 @@ BEGIN_NAMESPACE_BUNDLE {
 				// read socket error happen
 				//
 				this->removeSocket(so->fd(), "readSocket error");
-				return;
+				return false;
 			}
 			if (newmsg) {
 				//
@@ -169,20 +168,23 @@ BEGIN_NAMESPACE_BUNDLE {
 				Debug << "slot: " << this->id << ", newmsg";
 			}
 			else {
-				return; }
-		}			
+				return true; }
+		}
+		return false;
 	}
 
-	void WorkerProcess::writeSocket(SOCKET s) {
+	bool WorkerProcess::writeSocket(SOCKET s) {
 		Socket* so = GET_SOCKET(s);
-		CHECK_RETURN(so, void(0), "writeSocket: %d, not found Socket", s);
-		CHECK_RETURN(!so->is_listening(), void(0), "writeSocket: %d is listening", s);
+		CHECK_RETURN(so, false, "writeSocket: %d, not found Socket", s);
+		CHECK_RETURN(!so->is_listening(), false, "writeSocket: %d is fd of listening", s);
 		if (!so->sendMessage()) {
 			//
 			// write socket error happen
 			//
 			this->removeSocket(s, "writeSocket error");
+			return false;
 		}
+		return true;
 	}
 
 	void WorkerProcess::errorSocket(SOCKET s) {
@@ -267,7 +269,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			u64 nowtime = timeSecond();
 			for (SOCKET s = 0; s <= this->_maxfd; ++s) {
 				Socket* so = GET_SOCKET(s);
-				if (!so) {
+				if (!so || so->is_listening()) {
 					continue;
 				}
 		

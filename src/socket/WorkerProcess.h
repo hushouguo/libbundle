@@ -13,8 +13,8 @@
 BEGIN_NAMESPACE_BUNDLE {
 	class WorkerProcess : public Entry<u32> {
 		public:
-			void readSocket(SOCKET);
-			void writeSocket(SOCKET);
+			bool readSocket(SOCKET);
+			bool writeSocket(SOCKET);
 			void errorSocket(SOCKET);
 
 			void addSocket(SOCKET, bool is_listening = false);
@@ -53,7 +53,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			void checkSocket();
 			void handleMessage();
 			void acceptSocket(Socket*);
-			void readSocket(Socket*);
+			bool readSocket(Socket*);
 	};
 }
 
