@@ -913,6 +913,8 @@ BEGIN_NAMESPACE_BUNDLE {
 				return;	// SIGRTMIN: #define SIGRTMIN        (__libc_current_sigrtmin ())
 			}
 			switch (sig) {
+				case SIGWINCH: break;	// the window size change, ignore
+
 				case SIGHUP:			// NOTE: reload configure file
 					sConfig.reload = true;
 				case SIGALRM: break;	// timer expire
