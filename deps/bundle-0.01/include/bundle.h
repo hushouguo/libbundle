@@ -83,6 +83,10 @@
 #include <sys/epoll.h>
 #include <netinet/tcp.h>
 #include <openssl/md5.h>
+#include <openssl/sha.h>
+#include <openssl/des.h>
+#include <openssl/rsa.h>
+#include <openssl/pem.h>
 #include <getopt.h>
 #include <wchar.h>
 #include <locale.h>

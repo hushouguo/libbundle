@@ -823,6 +823,30 @@ BEGIN_NAMESPACE_BUNDLE {
 		return basename(__filename_buffer);
 	}
 
+	//
+	// get extension of filename
+	const char* getFilenameExtension(const char* filename) {
+		static char __filename_buffer[PATH_MAX];
+		strncpy(__filename_buffer, filename, sizeof(__filename_buffer));
+		char* p = strchr(__filename_buffer, '.');
+		if (p) {
+			*p++ = '\0';
+		}
+		return p;
+	}
+
+	//
+	// get prefix of filename
+	const char* getFilenamePrefix(const char* filename) {
+		static char __filename_buffer[PATH_MAX];
+		strncpy(__filename_buffer, filename, sizeof(__filename_buffer));
+		char* p = strchr(__filename_buffer, '.');
+		if (p != nullptr) {
+			*p++ = '\0';
+		}
+		return __filename_buffer;
+	}
+
 	const char* absoluteDirectory(const char* fullname) {
 		static char __dir_buffer[PATH_MAX];		
 		char* realdir = realpath(getDirectoryName(fullname), nullptr);
@@ -1162,6 +1186,121 @@ BEGIN_NAMESPACE_BUNDLE {
 		}
 		curl_easy_cleanup(curl);
 		return !url.empty();
+	}
+
+
+	//
+	// openssl.md5
+	void openssl_md5(const std::string& plainString, std::string& digestString) {
+		unsigned char digest[MD5_DIGEST_LENGTH];	// /usr/include/openssl/md5.h:# define MD5_DIGEST_LENGTH 16
+		MD5((const unsigned char *) plainString.c_str(), plainString.length(), digest);
+		digestString.assign((const char*) digest, MD5_DIGEST_LENGTH);
+	}
+
+	//
+	// openssl.sha256
+	void openssl_sha256(const std::string& plainString, std::string& digestString) {
+		unsigned char digest[SHA256_DIGEST_LENGTH];	// /usr/include/openssl/sha.h:# define SHA256_DIGEST_LENGTH    32	
+		SHA256((const unsigned char *) plainString.c_str(), plainString.length(), digest);
+		digestString.assign((const char*) digest, SHA256_DIGEST_LENGTH);
+	}
+	
+	//
+	// openssl.des, ecb mode
+	std::string openssl_des_encrypt(const std::string& plainString, const std::string& deskey) {
+		std::string cipherString;
+
+		DES_cblock keyEncrypt;  
+		memset(keyEncrypt, 0, sizeof(DES_cblock));
+
+		if (deskey.length() <= sizeof(DES_cblock)) {
+			memcpy(keyEncrypt, deskey.data(), deskey.length());  
+		}
+		else {
+			memcpy(keyEncrypt, deskey.data(), sizeof(DES_cblock));
+		}
+
+		DES_key_schedule keySchedule;  
+		DES_set_key_unchecked(&keyEncrypt, &keySchedule);  
+
+		const_DES_cblock inputText;  
+		DES_cblock outputText;  
+		std::vector<unsigned char> vecCiphertext;  
+		unsigned char tmp[8];  
+
+		for (int i = 0; i < (int) plainString.length() / 8; i++) {
+			memcpy(inputText, plainString.c_str() + i * 8, 8);
+			DES_ecb_encrypt(&inputText, &outputText, &keySchedule, DES_ENCRYPT);
+			memcpy(tmp, outputText, 8);
+			for (int j = 0; j < 8; j++) {
+				vecCiphertext.push_back(tmp[j]);
+			}
+		}  
+
+		if ((plainString.length() % 8) != 0) {
+			int tmp1 = plainString.length() / 8 * 8;  
+			int tmp2 = plainString.length() - tmp1;  
+			memset(inputText, 0, 8);  
+			memcpy(inputText, plainString.c_str() + tmp1, tmp2);  
+			DES_ecb_encrypt(&inputText, &outputText, &keySchedule, DES_ENCRYPT);  
+			memcpy(tmp, outputText, 8);  
+			for (int j = 0; j < 8; j++) {
+				vecCiphertext.push_back(tmp[j]);
+			}
+		}  
+
+		cipherString.clear();  
+		cipherString.assign(vecCiphertext.begin(), vecCiphertext.end());
+
+		return cipherString;  		
+	}
+
+	std::string openssl_des_decrypt(const std::string& cipherString, const std::string& deskey) {
+		std::string plainString;
+
+		DES_cblock keyEncrypt;
+		memset(keyEncrypt, 0, sizeof(DES_cblock));  
+
+		if (deskey.length() <= sizeof(DES_cblock)) {
+			memcpy(keyEncrypt, deskey.c_str(), deskey.length());  
+		} 
+		else {
+			memcpy(keyEncrypt, deskey.c_str(), sizeof(DES_cblock));
+		}
+
+		DES_key_schedule keySchedule;
+		DES_set_key_unchecked(&keyEncrypt, &keySchedule);  
+
+		const_DES_cblock inputText;  
+		DES_cblock outputText;  
+		std::vector<unsigned char> vecCleartext;  
+		unsigned char tmp[8];
+
+		for (int i = 0; i < (int) cipherString.length() / 8; i++) {
+			memcpy(inputText, cipherString.c_str() + i * 8, 8);  
+			DES_ecb_encrypt(&inputText, &outputText, &keySchedule, DES_DECRYPT);  
+			memcpy(tmp, outputText, 8);  
+			for (int j = 0; j < 8; j++) {
+				vecCleartext.push_back(tmp[j]);
+			}
+		}  
+
+		if ((cipherString.length() % 8) != 0) {
+			int tmp1 = cipherString.length() / 8 * 8;  
+			int tmp2 = cipherString.length() - tmp1;  
+			memset(inputText, 0, 8);  
+			memcpy(inputText, cipherString.c_str() + tmp1, tmp2);  
+			DES_ecb_encrypt(&inputText, &outputText, &keySchedule, DES_DECRYPT);  
+			memcpy(tmp, outputText, 8);  
+			for (int j = 0; j < 8; j++) {
+				vecCleartext.push_back(tmp[j]);
+			}
+		}  
+
+		plainString.clear();  
+		plainString.assign(vecCleartext.begin(), vecCleartext.end());  
+
+		return plainString;  		
 	}
 }
 

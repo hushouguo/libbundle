@@ -27,7 +27,7 @@ set(CMAKE_EXE_LINKER_FLAGS "-static-libgcc -static-libstdc++")
 
 add_executable(${target} ${src})
 
-target_link_libraries(${target} rt dl curl pthread)
+target_link_libraries(${target} rt dl crypto curl pthread)
 target_link_libraries(${target} ${BUNDLE_DIR}/lib/libbundle.a)
 target_link_libraries(${target} ${PROTOBUF_DIR}/lib/libprotobuf.a)
 target_link_libraries(${target} ${TCMALLOC_DIR}/lib/libtcmalloc_minimal.a)

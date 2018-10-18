@@ -28,7 +28,7 @@ set(CMAKE_EXE_LINKER_FLAGS "-static-libgcc -static-libstdc++")
 
 add_executable(${target} ${src})
 
-target_link_libraries(${target} dl curl pthread)
+target_link_libraries(${target} dl curl crypto pthread)
 target_link_libraries(${target} ${BUNDLE_DIR}/lib/libbundle.a)
 target_link_libraries(${target} ${PROTOBUF_DIR}/lib/libprotobuf.a)
 target_link_libraries(${target} ${MYSQL_DIR}/lib/libmysqlclient.a)

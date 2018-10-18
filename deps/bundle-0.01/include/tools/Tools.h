@@ -108,6 +108,14 @@ BEGIN_NAMESPACE_BUNDLE {
 	u64 getFileSize(const char* filename);
 
 	//
+	// get extension of filename
+	const char* getFilenameExtension(const char* filename);
+
+	//
+	// get prefix of filename
+	const char* getFilenamePrefix(const char* filename);
+
+	//
 	// load file content into string
 	bool loadfile(const char* filename, std::string& s);
 	
@@ -185,6 +193,24 @@ BEGIN_NAMESPACE_BUNDLE {
 	bool init_runtime_environment(int argc, char* argv[]);
 	void shutdown_bundle_library();
 
+
+	//
+	// openssl.md5
+	void openssl_md5(const std::string& plainString, std::string& digestString);
+
+	//
+	// openssl.sha256
+	void openssl_sha256(const std::string& plainString, std::string& digestString);
+
+	//
+	// openssl.des, ecb mode
+	std::string openssl_des_encrypt(const std::string& plainString, const std::string& deskey);
+	std::string openssl_des_decrypt(const std::string& cipherString, const std::string& deskey);
+
+	//
+	// openssl.rsa
+	// todo:
+	
 
 	//
 	// decode jscode to session_key & openid
