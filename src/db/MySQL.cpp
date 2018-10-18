@@ -168,9 +168,9 @@ BEGIN_NAMESPACE_BUNDLE {
 
 		if (true) { // wait timeout, default 8 hours
 			u32 seconds = MYSQL_WAIT_TIMEOUT;
-			char sql[1024];
-			snprintf(sql, sizeof(sql), "set wait_timeout=%d", seconds);
-			if (mysql_options(&this->_mysqlhandle, MYSQL_INIT_COMMAND, sql)) {
+			std::ostringstream sql;
+			sql << "set wait_timeout=" << seconds;
+			if (mysql_options(&this->_mysqlhandle, MYSQL_INIT_COMMAND, sql.str().c_str())) {
 				CHECK_GOTO(false, except_exit, "error: %s", mysql_error(&this->_mysqlhandle));
 			}
 		}
@@ -191,8 +191,6 @@ BEGIN_NAMESPACE_BUNDLE {
 			}
 		}
 
-		//TODO: SET NAMES UTF8
-
 		// CLIENT_INTERACTIVE & set interactive_timeout
 		if (!mysql_real_connect(
 					&this->_mysqlhandle, 
@@ -204,7 +202,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			CHECK_GOTO(false, except_exit, "error: %s", mysql_error(&this->_mysqlhandle));
 		}
 
-		return true;
+		return this->runCommand("SET NAMES UTF8");
 
 except_exit:
 		this->closeDatabase();
