@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<root>
+	<shard id = "1" /> <!-- 1 - 65535 -->
+	<log level = "0" dir = ".logs" autosplit_day = "true" autosplit_hour = "false"/> <!-- 0, 1, 2, 3, 4 -->
+	<limit stack_size = "16777216" max_files = "4000"/> <!-- 16M -->
+	<service address = "0.0.0.0" port = "9900">
+   		<security maxsize = "2000" silence_second = "10" threshold_interval = "10" threshold_message = "200"/>
+	</service>
+</root>
