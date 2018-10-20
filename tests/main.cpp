@@ -18,8 +18,8 @@
 int main(int argc, char** argv) {	
 	if (!bundle::init_runtime_environment(argc, argv)) { return 1; }
 
-	//test_tools();
-	test_net();
+	test_tools();
+	//test_net();
 	//test_csv("./csv/test.csv");
 	//test_xml("./xml/conf.xml");
 	//test_xml("../server/recordserver/conf/db.xml");

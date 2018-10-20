@@ -7,6 +7,30 @@
 
 using namespace bundle;
 void test_tools() {
+	if (true) {
+		sleep(1);
+		for (int n = 0; n < 10; ++n) {
+			int lines = 0;
+			for (int i = 1; i <= 50; ++i) {
+				int a = randomBetween(1, 99);
+				int b = randomBetween(1, 99);
+				if ((a + b) < 99) {
+					printf("%2d) %2d + %2d =    ", i, a, b);
+					lines++;
+					if (lines > 4) {
+						lines = 0;
+						printf("\n");
+					}
+				}
+				else {
+					--i;
+				}
+			}
+			printf("\n");
+		}
+		return;
+	}
+
 	auto performance_time = [](int times) {
 		for (int i = 0; i < times; ++i) {
 			std::time(nullptr);
