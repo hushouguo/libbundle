@@ -26,7 +26,7 @@ LogService::LogService()
 }
 
 bool LogService::init() {
-	return this->start(sConfig.get("service.address", "0.0.0.0"), sConfig.get("service.port", 9900), sConfig.get("service.worker", cpus() * 2));
+	return this->start(sConfig.get("service.address", "0.0.0.0"), sConfig.get("service.port", 9800), sConfig.get("service.worker", 0));
 }
 
 DECLARE_MESSAGE();
