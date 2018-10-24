@@ -21,6 +21,9 @@ BEGIN_NAMESPACE_BUNDLE {
 			const char* url() override {
 				return evhttp_request_get_uri(this->_evrequest);
 			}
+			const char* path() override {
+				return this->_path.c_str();
+			}
 			const char* header(const char* name) override {
 				return evhttp_find_header(this->_evrequest->input_headers, name);
 			}
@@ -68,6 +71,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 		private:
 			u32 _id = 0;
+			std::string _path;
 			struct evbuffer* _evbuffer = nullptr;
 			struct evhttp_request* _evrequest = nullptr;
 			std::unordered_map<std::string, std::string> _headers;
@@ -103,6 +107,8 @@ BEGIN_NAMESPACE_BUNDLE {
 					this->_headers.insert(std::make_pair(header->key, header->value));
 				}		
 			}
+			// for: /charge.php?a=1&b=2, path: /charge.php
+			this->_path = evhttp_uri_get_path(evuri);
 			evhttp_uri_free(evuri);
 		}
 		else {

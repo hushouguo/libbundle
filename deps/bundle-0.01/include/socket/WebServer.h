@@ -16,6 +16,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			virtual u32 id() = 0;
 			virtual evhttp_cmd_type cmd() = 0;
 			virtual const char* url() = 0;
+			virtual const char* path() = 0;
 			virtual const char* header(const char* name) = 0;
 			virtual const char* variable(const char* name) = 0;
 			virtual const char* remote_host() = 0;

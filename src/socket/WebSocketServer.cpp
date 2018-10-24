@@ -330,7 +330,7 @@ BEGIN_NAMESPACE_BUNDLE {
 		std::string server_key = Sec_WebSocket_Key;
 		server_key += MAGIC_KEY;
 		
-		SHA1 sha;
+		SHA1 sha;	// Note: replace SHA with openssl.sha
 		unsigned int message_digest[5];
 		sha.Reset();
 		sha << server_key.c_str();
