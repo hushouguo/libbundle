@@ -6,6 +6,8 @@
 #include "global.h"
 
 int main(int argc, char* argv[]) {
+	printf("sizeof(suseconds_t): %ld\n", sizeof(suseconds_t));
+
 	if (!init_runtime_environment(argc, argv)) { return 1; }
 	
 	//CHECK_GOTO(sCentralClient.init(), exit_except, "CentralClient init failure");

@@ -10,7 +10,6 @@
 using namespace bundle;
 #include "ClientTask.h"
 #include "ClientTaskManager.h"
-#include "CentralClient.h"
-#include "GatewayService.h"
+#include "LogService.h"
 
 #endif

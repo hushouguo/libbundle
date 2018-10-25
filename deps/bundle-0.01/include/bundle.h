@@ -181,6 +181,9 @@
 // rapidjson-1.1.0
 #include "rapidjson-1.1.0/document.h"
 
+// libuv-1.23.2
+#include "uv.h"
+
 using u8 		= 						uint8_t;
 using u16 		= 						uint16_t;
 using u32		= 						uint32_t;
