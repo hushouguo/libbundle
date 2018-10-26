@@ -26,13 +26,14 @@ aux_source_directory(xml src)
 aux_source_directory(recordclient src)
 aux_source_directory(entity src)
 aux_source_directory(lockfree src)
+aux_source_directory(uv src)
 
 link_directories(/usr/lib64) 
 link_directories(/usr/lib64/mysql)
 
 add_executable(${target} ${src} main.cpp)
 
-target_link_libraries(${target} rt dl curl crypto unwind pthread)
+target_link_libraries(${target} rt dl curl crypto unwind -pthread)
 target_link_libraries(${target} ${BUNDLE_DIR}/lib/libbundle.a)
 target_link_libraries(${target} ${PROTOBUF_DIR}/lib/libprotobuf.a)
 target_link_libraries(${target} ${LIBEVENT_DIR}/lib/libevent.a)
