@@ -157,6 +157,10 @@
 #include <google/protobuf/compiler/importer.h>
 #include <google/protobuf/dynamic_message.h>
 
+//NOTE: for now, 0mq version is 4.3.0, ZMQ_SERVER/ZMQ_CLIENT still is draft api
+#define ZMQ_BUILD_DRAFT_API
+#include "zmq.h"
+
 // mysql 5.6.37
 //#include <mysql/mysql.h>
 //#include <mysql/errmsg.h>
@@ -296,6 +300,7 @@ BEGIN_NAMESPACE_BUNDLE {
 #include "net/NetworkInterface.h"
 #include "net/NetworkService.h"
 #include "net/NetworkClient.h"
+#include "net/MessageQueue.h"
 #include "db/MySQLStatement.h"
 #include "db/MySQLResult.h"
 #include "db/MySQL.h"

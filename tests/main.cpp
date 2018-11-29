@@ -15,6 +15,7 @@
 #include "entity/test_entity.h"
 #include "lockfree/test_lockfree.h"
 #include "uv/test_uv.h"
+#include "zmq/test_zmq.h"
 
 int main(int argc, char** argv) {	
 	if (!bundle::init_runtime_environment(argc, argv)) { return 1; }
@@ -29,7 +30,8 @@ int main(int argc, char** argv) {
 	//test_recordclient("127.0.0.1", 9990);
 	//test_entity();
 	//test_lockfree();
-	test_uv();
+	//test_uv();
+	test_zmq();
 
 	bundle::shutdown_bundle_library();
 	return 0;
