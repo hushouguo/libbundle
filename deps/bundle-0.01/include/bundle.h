@@ -302,6 +302,7 @@ BEGIN_NAMESPACE_BUNDLE {
 #include "net/NetworkClient.h"
 #include "net/MessageQueue.h"
 #include "net/MessageQueueClient.h"
+#include "net/MessageQueueService.h"
 #include "db/MySQLStatement.h"
 #include "db/MySQLResult.h"
 #include "db/MySQL.h"
