@@ -266,7 +266,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 	void WorkerProcess::checkSocket() {
 		if (this->_opts[BUNDLE_SOL_SILENCE_SECOND] > 0 || this->_opts[BUNDLE_SOL_THRESHOLD_MESSAGE] > 0) {
-			u64 nowtime = timeSecond();
+			u64 nowtime = currentSecond();
 			for (SOCKET s = 0; s <= this->_maxfd; ++s) {
 				Socket* so = GET_SOCKET(s);
 				if (!so || so->is_listening()) {

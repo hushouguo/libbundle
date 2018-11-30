@@ -29,7 +29,7 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	void Socket::receivedMessage() {
-		u64 nowtime = timeSecond();
+		u64 nowtime = currentSecond();
 		this->_lastSecond = nowtime;
 		u32 mod = nowtime % COUNT_MESSAGE_SPAN;
 		this->_countMessage[mod]++;
@@ -38,7 +38,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 	u32 Socket::recentMessage(u32 seconds) {
 		u32 total = 0;
-		u64 nowtime = timeSecond();
+		u64 nowtime = currentSecond();
 		for (u32 n = 0; n < seconds; ++n) {
 			total += this->_countMessage[(nowtime - n) % COUNT_MESSAGE_SPAN];
 		}

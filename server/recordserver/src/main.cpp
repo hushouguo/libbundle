@@ -22,7 +22,7 @@ exit_except:
 	sRecordService.stop();
 	sRecordProcessManager.stop();
 	shutdown_bundle_library();
-	return 0;	 
+	return 0;
 }
 
 

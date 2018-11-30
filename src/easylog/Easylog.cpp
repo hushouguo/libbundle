@@ -32,8 +32,8 @@
 //	1 million log_message and write to file stream and not flush, not stdout, waste: 1231 ms
 //	1 million log_message to file and flush right now, waste: 2397 ms
 //	1 million timestamp function waste: 1721 ms
-//	1 million timeSecond function waste: 4 ms
-//	1 million timeMillisecond function waste: 38 ms
+//	1 million currentSecond function waste: 4 ms
+//	1 million currentMillisecond function waste: 38 ms
 //	1 million gettimeofday function waste: 19 ms
 //	1 million gmtime to timestamp function waste: 138 ms
 //
@@ -564,7 +564,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			fprintf(stderr, "ofstream exception: %s, filename: %s\n", e.what(), levelNode->fullname.c_str());
 			SafeDelete(levelNode->fs);
 		}
-		levelNode->fs_launchtime = timeSecond();	
+		levelNode->fs_launchtime = currentSecond();	
 	}
 
 	void EasylogInternal::autosplit_file(EasylogLevelNode* levelNode) {
