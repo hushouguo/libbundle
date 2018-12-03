@@ -7,6 +7,12 @@
 #define __NETMESSAGE_H__
  
 BEGIN_NAMESPACE_BUNDLE {
+#define MESSAGE_FLAG_PROTOBUF			(1 << 0)
+#define MESSAGE_FLAG_JSON				(1 << 1)
+#define MESSAGE_FLAG_BINARY				(1 << 2)
+#define MESSAGE_FLAG_ZIP				(1 << 3)
+#define MESSAGE_FLAG_ENCRYPT			(1 << 4)
+
 #pragma pack(push, 1)
 	struct Netmessage {
 		Netmessage(u16 _id) : len(sizeof(Netmessage)), id(_id), flags(0), timestamp(0) {}

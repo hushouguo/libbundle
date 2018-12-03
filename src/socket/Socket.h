@@ -49,7 +49,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			WorkerProcess* _slotWorker = nullptr;
 			bool splitMessage(Socketmessage*& msg);
 			
-			u64 _lastSecond = timeSecond();
+			u64 _lastSecond = currentSecond();
 			u32 _countMessage[COUNT_MESSAGE_SPAN];
 			u32 _totalMessage = 0;
 			void receivedMessage();

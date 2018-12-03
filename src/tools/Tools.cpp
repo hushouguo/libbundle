@@ -69,13 +69,13 @@ BEGIN_NAMESPACE_BUNDLE {
 
 	//
 	// get current time seconds	
-	u64 timeSecond() {		
+	u64 currentSecond() {		
 		return std::time(nullptr); // cost of executing 1 million times is: 4 ms
 	}
 
 	//
 	// get current time milliseconds	
-	u64 timeMillisecond() {
+	u64 currentMillisecond() {
 		// cost of executing 1 million times is:
 		// 		c++ 11 waste: 38 ms
 		//		gettimeofday waste: 19 ms
@@ -85,8 +85,9 @@ BEGIN_NAMESPACE_BUNDLE {
 		return tv.tv_sec * 1000 + tv.tv_usec / 1000;
 #else
 		return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-#endif		
+#endif
 	}
+	
 
 	// cost of executing 1 million times is:
 	//		c++ 11 waste: 1721 ms

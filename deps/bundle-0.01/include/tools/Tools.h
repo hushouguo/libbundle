@@ -18,11 +18,11 @@ BEGIN_NAMESPACE_BUNDLE {
 
 	//
 	// get current time seconds
-	u64 timeSecond();
+	u64 currentSecond();
 
 	//
 	// get current time milliseconds
-	u64 timeMillisecond();
+	u64 currentMillisecond();
 	
 	//
 	// get current timestamp

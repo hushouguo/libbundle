@@ -131,7 +131,7 @@ BEGIN_NAMESPACE_BUNDLE {
 
 			// cookie
 			void setCookie(const char* name, u32 seconds) override {
-				u64 expires = timeSecond() + seconds;
+				u64 expires = currentSecond() + seconds;
 				char time_buffer[64];
 				timestamp_gmt(time_buffer, sizeof(time_buffer), expires);
 
@@ -141,7 +141,7 @@ BEGIN_NAMESPACE_BUNDLE {
 				this->addHeader("Set-Cookie", o.str().c_str());
 			}
 			void setCookie(const char* name, const char* value, u32 seconds) override {
-				u64 expires = timeSecond() + seconds;
+				u64 expires = currentSecond() + seconds;
 				char time_buffer[64];
 				timestamp_gmt(time_buffer, sizeof(time_buffer), expires);
 
