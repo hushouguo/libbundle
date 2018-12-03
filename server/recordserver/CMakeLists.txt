@@ -18,6 +18,8 @@ include_directories(${MYSQL_DIR}/include)
 include_directories(${RAPIDXML_DIR})
 include_directories(${RAPIDJSON_DIR})
 include_directories(${LIBEVENT_DIR}/include)
+include_directories(${LIBUV_DIR}/include)
+include_directories(${LIBZMQ_DIR}/include)
 
 aux_source_directory(src src)
 
@@ -28,7 +30,7 @@ set(CMAKE_EXE_LINKER_FLAGS "-static-libgcc -static-libstdc++")
 
 add_executable(${target} ${src})
 
-target_link_libraries(${target} dl curl crypto pthread)
+target_link_libraries(${target} dl curl crypto -pthread)
 target_link_libraries(${target} ${BUNDLE_DIR}/lib/libbundle.a)
 target_link_libraries(${target} ${PROTOBUF_DIR}/lib/libprotobuf.a)
 target_link_libraries(${target} ${MYSQL_DIR}/lib/libmysqlclient.a)

@@ -28,7 +28,7 @@ BEGIN_NAMESPACE_BUNDLE {
 			void * _zmq_ctx = nullptr;
 			void * _zmq_socket = nullptr;
 			//std::unordered_map<uint32_t, uint64_t> _clients;
-//			void handleMessage(void* socket);
+			void handleMessage(void* socket);
 	};
 }
 

@@ -191,7 +191,8 @@ BEGIN_NAMESPACE_BUNDLE {
 	}
 
 	void EasylogMessage::flush() {
-		if (this->tellp() > 0) {
+		//if (this->tellp() > 0) {
+		if (this->rdbuf()->in_avail()) {
 			*this << "\n";
 			this->_easylog->log_message(this);
 		}

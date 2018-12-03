@@ -19,6 +19,8 @@ include_directories(${RAPIDXML_DIR})
 include_directories(${RAPIDJSON_DIR})
 include_directories(${LIBEVENT_DIR}/include)
 include_directories(${CURL_DIR}/include)
+include_directories(${LIBUV_DIR}/include)
+include_directories(${LIBZMQ_DIR}/include)
 
 aux_source_directory(base64 src)
 aux_source_directory(config src)

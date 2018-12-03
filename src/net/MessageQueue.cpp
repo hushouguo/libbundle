@@ -6,7 +6,6 @@
 #include "bundle.h"
 
 BEGIN_NAMESPACE_BUNDLE {
-#if 0	
 	MessageQueue::MessageQueue(int socket_type) {
 		this->_socket_type = socket_type;
 		this->_zmq_ctx = zmq_ctx_new();
@@ -24,12 +23,12 @@ BEGIN_NAMESPACE_BUNDLE {
 		if (this->_socket_type == ZMQ_SERVER) {
 			int rc = zmq_bind(this->_zmq_socket, buffer);
 			CHECK_RETURN(rc == 0, false, "zmq_bind error:%d,%s", zmq_errno(), zmq_strerror(zmq_errno()));
-			log_trace("Server bind on: %s", buffer);
+			Trace << "Server bind on: " << buffer;
 		}
 		else {
 			int rc = zmq_connect(this->_zmq_socket, buffer);
 			CHECK_RETURN(rc == 0, false, "zmq_connect error:%d,%s", zmq_errno(), zmq_strerror(zmq_errno()));
-			log_trace("Client connect to: %s", buffer);
+			Trace << "Client connect to: " << buffer;
 		}
 		return true;
 	}
@@ -59,15 +58,16 @@ BEGIN_NAMESPACE_BUNDLE {
 
 		if (true) {
 			size_t size = zmq_msg_size(&msg);
-			rawmessage* rawmsg = (rawmessage *) zmq_msg_data(&msg);
-			CHECK_GOTO(size == rawmsg->len, exit_except, "error rawmsg->len:%d, size:%ld", rawmsg->len, size);
-			CHECK_GOTO(size >= sizeof(rawmessage), exit_except, 
-					"illegal msg size:%ld, expect:%ld", size, sizeof(rawmessage));
+			//rawmessage* rawmsg = (rawmessage *) zmq_msg_data(&msg);
+			//CHECK_GOTO(size == rawmsg->len, exit_except, "error rawmsg->len:%d, size:%ld", rawmsg->len, size);
+			//CHECK_GOTO(size >= sizeof(rawmessage), exit_except, 
+			//		"illegal msg size:%ld, expect:%ld", size, sizeof(rawmessage));
 
 			//Note: we need check max message size ?
 			
 			uint32_t clientid = zmq_msg_routing_id(&msg);// for ZMQ_SERVER, clientid != 0, for ZMQ_CLIENT, clientid == 0
-			this->handleMessage(clientid, rawmsg);
+			//this->handleMessage(clientid, rawmsg);
+			Trace << "receiveMessage size: " << size << ", clientid: " << clientid << ", data: " << (const char*)zmq_msg_data(&msg);
 		}
 
 exit_except:
@@ -75,6 +75,7 @@ exit_except:
 		CHECK_RETURN(rc == 0, void(0), "zmq_msg_close error:%d,%s", zmq_errno(), zmq_strerror(zmq_errno()));
 	}
 
+#if 0
 	void MessageQueue::sendMessage(rawmessage* rawmsg, uint32_t clientid) {
 		CHECK_RETURN(rawmsg->len > 0, void(0), "illegal rawmsg->len:%u", rawmsg->len);
 
@@ -118,7 +119,6 @@ except_exit:
 		this->sendMessage(rawmsg, clientid);
 	}
 
-//#if 0
 	void MessageQueue::sendRetcode(NetData::RC rc, uint32_t clientid)
 	{
 		NetData::ErrorCode errmsg;
